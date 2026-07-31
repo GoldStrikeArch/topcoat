@@ -1,0 +1,17 @@
+[package]
+name = "view-dom"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# The upstream `view!` grammar, plus the key plan both emitters share.
+topcoat-view-grammar = { path = "../../../crates/topcoat-view/grammar", features = [
+    "dom",
+] }
+# The template ABI the emitted statics are written against.
+view-abi = { path = "../view-abi" }
+
+proc-macro2 = "1.0.106"
+quote = "1.0.45"
+syn = { version = "2.0.117", features = ["full", "extra-traits"] }

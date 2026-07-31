@@ -1,0 +1,31 @@
+# Deliberately its own workspace: it keeps topcoat's dependency graph out of the
+# spike's `Cargo.lock`, and keeps a bare `cargo build --release` in the spike
+# from recursing into this build script.
+[workspace]
+
+[package]
+name = "demo-app"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+futures-core = "0.3"
+futures-util = "0.3"
+js-extern-macro = { path = "../js-extern-macro" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+# `dom` makes every `view!` write the hydration keys and markers an island's
+# client half finds its nodes by. They render only inside an island, so a page
+# without one comes out byte for byte as it did before.
+topcoat = { path = "../../../crates/topcoat", features = ["dom", "sse"] }
+view-dom-macro = { path = "../view-dom-macro" }
+
+[build-dependencies]
+jsc-build = { path = "../jsc-build" }
+
+[lints.rust]
+# An island holds both its halves, and this is what picks the client one. Only
+# the client crate's compile sets it.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(topcoat_client)'] }

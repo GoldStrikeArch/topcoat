@@ -1,0 +1,21 @@
+[package]
+name = "view-dom-macro"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+proc-macro = true
+
+[dependencies]
+# The lowering itself; this crate is only the entry point over it.
+view-dom = { path = "../view-dom" }
+topcoat-view-grammar = { path = "../../../crates/topcoat-view/grammar", features = [
+    "dom",
+] }
+
+proc-macro2 = "1.0.106"
+syn = { version = "2.0.117", features = ["full", "extra-traits"] }
+
+[dev-dependencies]
+view-abi = { path = "../view-abi" }

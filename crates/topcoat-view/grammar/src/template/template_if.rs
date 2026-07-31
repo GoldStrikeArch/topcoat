@@ -21,6 +21,7 @@ pub struct TemplateIf<T> {
 
 impl<T: WriteView> WriteView for TemplateIf<T> {
     fn write(&self, writer: &mut ViewWriter) {
+        writer.take_reactive_scope_key();
         writer.if_else(&self.cond, |then_writer, else_writer| {
             self.then_branch.write(then_writer);
             if let Some(else_branch) = self.else_branch.as_ref() {

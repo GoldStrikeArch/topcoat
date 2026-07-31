@@ -46,6 +46,22 @@ pub struct Event {
 }
 
 impl Event {
+    /// The value of the element the event came from, or the empty string when
+    /// it has none.
+    ///
+    /// The same reading as `target.value`, spelled as one call so that a handler
+    /// written once can be compiled for the browser by a client compiler as
+    /// well: an island's view is one source, and the field chain is not a
+    /// spelling both compilers have.
+    ///
+    /// # Panics
+    ///
+    /// Always panics; a handler body only runs in the browser.
+    #[must_use]
+    pub fn target_value(&self) -> StringSurrogate {
+        unreachable!();
+    }
+
     pub fn prevent_default(&self) {
         unreachable!();
     }

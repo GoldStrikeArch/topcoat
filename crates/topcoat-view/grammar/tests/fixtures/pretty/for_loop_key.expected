@@ -1,0 +1,5 @@
+view! {
+    for item in items key (item.id) {
+        <li>(item)</li>
+    }
+}

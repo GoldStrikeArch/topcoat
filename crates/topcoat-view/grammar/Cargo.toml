@@ -11,6 +11,8 @@ categories.workspace = true
 rust-version.workspace = true
 
 [features]
+# The key plan shared by the emitters that lower a view to DOM operations.
+dom = []
 pretty = ["topcoat-core-grammar/pretty"]
 
 [dependencies]

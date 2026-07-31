@@ -102,23 +102,7 @@ impl BuildOpts {
     /// The `cargo build` invocation for these options.
     fn command(&self) -> Command {
         let mut cmd = Command::new("cargo");
-        // Strip env vars inherited from the outer `cargo run` that invoked
-        // us, so the inner build has the same fingerprint as a plain `cargo
-        // build` the user would run by hand. Otherwise CARGO/RUSTC/
-        // RUSTC_WRAPPER/etc. shift the rustc/profile fingerprint hashes and
-        // force cache-busting rebuilds.
-        for (k, _) in std::env::vars_os() {
-            let key = k.to_string_lossy();
-            if key.starts_with("CARGO")
-                || key == "RUSTC"
-                || key == "RUSTC_WRAPPER"
-                || key == "RUSTC_WORKSPACE_WRAPPER"
-                || key == "RUSTUP_TOOLCHAIN"
-                || key == "RUSTFLAGS"
-            {
-                cmd.env_remove(&k);
-            }
-        }
+        scrub_env(&mut cmd);
         cmd.args(["build", "--message-format=json-diagnostic-rendered-ansi"]);
         cmd.env("CARGO_TERM_PROGRESS_WHEN", "always");
         cmd.env("CARGO_TERM_PROGRESS_WIDTH", "80");
@@ -135,6 +119,27 @@ impl BuildOpts {
             cmd.args(["--profile", profile]);
         }
         cmd
+    }
+}
+
+/// Strip the environment variables inherited from the outer `cargo run` that
+/// invoked us, so a child build has the same fingerprint as the plain command
+/// the user would run by hand. Left set, `CARGO*`, `RUSTC*`, and `RUSTFLAGS`
+/// shift the rustc and profile fingerprint hashes and force cache-busting
+/// rebuilds, and `RUSTUP_TOOLCHAIN` silently overrides a `+toolchain` the child
+/// asks for.
+pub fn scrub_env(command: &mut Command) {
+    for (key, _) in std::env::vars_os() {
+        let name = key.to_string_lossy();
+        if name.starts_with("CARGO")
+            || name == "RUSTC"
+            || name == "RUSTC_WRAPPER"
+            || name == "RUSTC_WORKSPACE_WRAPPER"
+            || name == "RUSTUP_TOOLCHAIN"
+            || name == "RUSTFLAGS"
+        {
+            command.env_remove(&key);
+        }
     }
 }
 

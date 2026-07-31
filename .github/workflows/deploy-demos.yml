@@ -1,0 +1,144 @@
+name: Deploy Demos
+
+# Publishes the spike's demo app to GitHub Pages as a static snapshot. The
+# backend compiles the islands to JavaScript at build time and the server
+# renders every page, so a crawl of a locally running server is a complete
+# site: the showcase page's three islands are pure client programs and stay
+# fully interactive. The pages that need a live server (the searching island's
+# POST, the dashboard's event stream) render but their round trips stay inert.
+#
+# A project site is served under `/<repo>/`, so the app is built with
+# `TOPCOAT_BASE_URL=/<repo>`: every URL the pages carry picks the prefix up at
+# the source (see demo-app/src/base.rs), and `scripts/snapshot.mjs` lays the
+# files out to match. Nothing is rewritten after the fact.
+#
+# One-time setup on the repository: Settings -> Pages -> Source -> GitHub
+# Actions. No secrets are involved.
+
+on:
+  push:
+    branches:
+      - spike/rust-js
+  workflow_dispatch:
+
+# A newer push supersedes an older deploy wholesale, so cancelling mid-build
+# loses nothing.
+concurrency:
+  group: deploy-demos
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build the snapshot
+    runs-on: ubuntu-latest
+    # The upstream repository has no Pages site to deploy to; forks are where
+    # this runs.
+    if: github.repository_owner != 'tokio-rs'
+    # A cold run builds the backend, a sysroot, the CLI, and the app. The
+    # caches below get later runs well under this.
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # The snapshot script runs under node. No lockfile is involved, so
+          # there is nothing to cache.
+          node-version: 22
+
+      # The pin and its components come out of the spike's own toolchain file,
+      # so this workflow never repeats what the backend needs. The repository
+      # root pins stable separately and is untouched.
+      - name: install the pinned nightly
+        working-directory: spike/rustc-codegen-js
+        run: |
+          set -euo pipefail
+          rustup toolchain install
+          rustc --version --verbose
+
+      # Cargo build directories for the three workspaces this run compiles:
+      # the spike (backend and macro dylibs, nightly), the demo app, and the
+      # repository root (the CLI, stable).
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            spike/rustc-codegen-js -> target
+            spike/rustc-codegen-js/demo-app -> target
+            . -> target
+
+      # The sysroot is `core` and `alloc` compiled by the backend, so it is
+      # stale the moment the backend or the pin moves: the key covers both and
+      # there is deliberately no restore-keys fallback, because an almost
+      # matching sysroot is exactly the kind of almost that links two spellings
+      # of one item.
+      - name: cache the sysroot
+        uses: actions/cache@v4
+        with:
+          path: spike/rustc-codegen-js/build
+          key: jsc-sysroot-${{ runner.os }}-${{ hashFiles('spike/rustc-codegen-js/rust-toolchain.toml', 'spike/rustc-codegen-js/patches/**', 'spike/rustc-codegen-js/backend/**', 'spike/rustc-codegen-js/scripts/build_sysroot.sh') }}
+
+      - name: build the backend
+        working-directory: spike/rustc-codegen-js
+        run: bash scripts/build.sh
+
+      - name: build the sysroot
+        working-directory: spike/rustc-codegen-js
+        env:
+          JS_EXTRA_ARGS: ""
+        run: bash scripts/build_sysroot.sh
+
+      # The app's build script loads both macro dylibs; jsc-build checks their
+      # staleness rather than building them.
+      - name: build the macro dylibs
+        working-directory: spike/rustc-codegen-js
+        run: cargo build --release -p view-dom-macro -p js-extern-macro
+
+      # The CLI bundles the app's content hashed assets. It lives in the root
+      # workspace on the stable pin.
+      - name: build the topcoat CLI
+        run: cargo build -p topcoat-cli --bin topcoat
+
+      - name: build the app under the base URL
+        working-directory: spike/rustc-codegen-js/demo-app
+        env:
+          TOPCOAT_BASE_URL: /${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+          cargo build
+          cargo test
+
+      - name: bundle the assets
+        working-directory: spike/rustc-codegen-js/demo-app
+        run: ../../../target/debug/topcoat asset bundle
+
+      - name: snapshot
+        working-directory: spike/rustc-codegen-js/demo-app
+        env:
+          TOPCOAT_BASE_URL: /${{ github.event.repository.name }}
+        run: node scripts/snapshot.mjs dist
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: spike/rustc-codegen-js/demo-app/dist
+
+  deploy:
+    name: deploy to pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,278 @@
+{
+ "$generatedBy": "distilled from spike/rustc-codegen-js/contract/fixtures/procedure-wire.json",
+ "$doNotEditByHand": "Re-distill from the contract fixture instead. That file is the single source for these vectors and for the client fixtures that produce them; a diff here after it changes IS the drift report.",
+ "$what": "The procedure call wire: what a client POSTs to a #[procedure] route and what comes back. THE SINGLE SOURCE for the framework crate's HTTP tests and for wave 3's client fixtures, so that the two cannot disagree about the wire while both passing.",
+ "$howToUse": "Framework/server tests: for each vector with `direction: \"request\"`, build a POST to `route.prefix + '/' + id` with `contentType` and `body` verbatim, and assert `expect`.",
+ "$derived": "A vector whose `derived` is true was NOT observed in an existing test; it follows from the cited code and is a prediction to confirm on first contact. Everything else cites the test that already pins it.",
+ "$corrections": [
+  {
+   "vector": "serde-wrong-argument-type",
+   "claimed": "expect.bodyEndsWith = \"(at `1`)\"",
+   "observed": "expect.bodyEndsWith = \"(at `[1]`)\"",
+   "why": "serde_path_to_error renders a sequence index in brackets, and the argument array is a sequence, so the path of the second argument is `[1]` and not `1`. The argument index the contract page is about IS in the message; only its spelling was predicted wrong. Corrected here and reported for the contract fixture to follow."
+  }
+ ],
+ "route": {
+  "prefix": "/_topcoat/procedures",
+  "path": "/_topcoat/procedures/{id}",
+  "method": "POST",
+  "idIsUrlEncodedByTheClient": true,
+  "$otherMethods": "A ProcedureRoute answers Methods::Only(&[Method::POST]), so any other method is the router's 405, not the procedure's business.",
+  "$unknownId": "No route is registered for an id that was never mounted, so an unknown procedure is the router's 404. There is no per-procedure 'no such procedure' error."
+ },
+ "vectorCount": 19,
+ "vectors": [
+  {
+   "id": "serde-two-args",
+   "wire": "serde",
+   "direction": "request",
+   "signature": "async fn f(a: f64, b: String) -> Result<..>",
+   "args": "(2.5, \"x\")",
+   "contentType": "application/topcoat+json",
+   "body": "[2.5,\"x\"]",
+   "decodesTo": "(f64, String) == (2.5, \"x\".to_owned())",
+   "expect": {
+    "status": 200
+   },
+   "pinnedBy": "crates/topcoat-runtime/src/procedure.rs:292-300"
+  },
+  {
+   "id": "serde-one-arg",
+   "wire": "serde",
+   "direction": "request",
+   "signature": "async fn f(a: f64) -> Result<..>",
+   "args": "(2.5,)",
+   "contentType": "application/topcoat+json",
+   "body": "[2.5]",
+   "decodesTo": "(f64,) == (2.5,)",
+   "expect": {
+    "status": 200
+   },
+   "$note": "One argument is still an ARRAY, not a bare value. The tuple is (T,).",
+   "derived": true
+  },
+  {
+   "id": "serde-zero-args",
+   "wire": "serde",
+   "direction": "request",
+   "signature": "async fn f() -> Result<..>",
+   "args": "()",
+   "contentType": "application/topcoat+json",
+   "body": "[]",
+   "decodesTo": "[(); 0]",
+   "expect": {
+    "status": 200
+   },
+   "pinnedBy": "crates/topcoat-runtime/src/procedure.rs:302-310"
+  },
+  {
+   "id": "serde-struct-arg",
+   "wire": "serde",
+   "direction": "request",
+   "signature": "async fn f(input: Input) -> Result<..> where Input { name: String, count: u32 }",
+   "args": "(Input { name: \"x\".into(), count: 3 },)",
+   "contentType": "application/topcoat+json",
+   "body": "[{\"count\":3,\"name\":\"x\"}]",
+   "decodesTo": "(Input { name: \"x\", count: 3 },)",
+   "expect": {
+    "status": 200
+   },
+   "$note": "The whole reason the serde wire exists: Input has no Surrogated impl and never needs one. Field order in the body is the client's business -- serde does not require declaration order.",
+   "derived": true
+  },
+  {
+   "id": "serde-zero-args-rejects-null",
+   "wire": "serde",
+   "direction": "request",
+   "signature": "async fn f() -> Result<..>",
+   "contentType": "application/topcoat+json",
+   "body": "null",
+   "expect": {
+    "status": 400,
+    "bodyStartsWith": "bad request: invalid JSON value:"
+   },
+   "$why": "`null` is the SURROGATE wire's zero-argument body. Each wire rejects the other's spelling, which is what makes the asymmetry safe.",
+   "pinnedBy": "crates/topcoat-runtime/src/procedure.rs:312-323"
+  },
+  {
+   "id": "serde-rejects-json-media-type",
+   "wire": "serde",
+   "direction": "request",
+   "signature": "async fn f(a: f64) -> Result<..>",
+   "contentType": "application/json",
+   "body": "[1.0]",
+   "expect": {
+    "status": 400,
+    "bodyExactly": "bad request: expected request with `Content-Type: application/topcoat+json`"
+   },
+   "$why": "A well-formed serde body sent under the other wire's media type. The message names the media type it wanted.",
+   "pinnedBy": "crates/topcoat-runtime/src/procedure.rs:325-339"
+  },
+  {
+   "id": "serde-rejects-missing-media-type",
+   "wire": "serde",
+   "direction": "request",
+   "signature": "async fn f(a: f64) -> Result<..>",
+   "contentType": null,
+   "body": "[1.0]",
+   "expect": {
+    "status": 400,
+    "bodyExactly": "bad request: expected request with `Content-Type: application/topcoat+json`"
+   },
+   "pinnedBy": "crates/topcoat-runtime/src/procedure.rs:325-339"
+  },
+  {
+   "id": "serde-media-type-with-parameters",
+   "wire": "serde",
+   "direction": "request",
+   "signature": "async fn f(a: f64) -> Result<..>",
+   "contentType": "application/topcoat+json; charset=utf-8",
+   "body": "[1.0]",
+   "expect": {
+    "status": 200
+   },
+   "$why": "Parameters after the media type are ignored, so a client that sends a charset is not punished for it.",
+   "pinnedBy": "crates/topcoat-runtime/src/procedure.rs:272-280"
+  },
+  {
+   "id": "serde-wrong-argument-type",
+   "wire": "serde",
+   "direction": "request",
+   "signature": "async fn f(a: f64, b: String) -> Result<..>",
+   "contentType": "application/topcoat+json",
+   "body": "[2.5,7]",
+   "expect": {
+    "status": 400,
+    "bodyStartsWith": "bad request: invalid JSON value:",
+    "bodyEndsWith": "(at `[1]`)"
+   },
+   "$why": "The path is the argument's index in the array, so the error names WHICH argument was wrong.",
+   "pinnedBy": "crates/topcoat-runtime/src/procedure.rs:341-349",
+   "$corrected": true
+  },
+  {
+   "id": "serde-wrong-arity",
+   "wire": "serde",
+   "direction": "request",
+   "signature": "async fn f(a: f64, b: String) -> Result<..>",
+   "contentType": "application/topcoat+json",
+   "body": "[1.0]",
+   "expect": {
+    "status": 400,
+    "bodyStartsWith": "bad request: invalid JSON value:"
+   },
+   "derived": true
+  },
+  {
+   "id": "serde-malformed-body",
+   "wire": "serde",
+   "direction": "request",
+   "signature": "async fn f(a: f64) -> Result<..>",
+   "contentType": "application/topcoat+json",
+   "body": "[1.0",
+   "expect": {
+    "status": 400,
+    "bodyStartsWith": "bad request: invalid JSON syntax:"
+   },
+   "bodyIsValidJson": false,
+   "derived": true
+  },
+  {
+   "id": "surrogate-zero-args",
+   "wire": "surrogate",
+   "direction": "request",
+   "signature": "async fn f() -> Result<..>",
+   "args": "()",
+   "contentType": "application/json",
+   "body": "null",
+   "expect": {
+    "status": 200
+   },
+   "$why": "The literal `null`, not `[]`. This is the branch `args.length === 0 ? null : ...` in the browser client.",
+   "pinnedBy": "crates/topcoat-runtime/browser/src/surrogate/procedure.ts:17-24"
+  },
+  {
+   "id": "surrogate-two-args",
+   "wire": "surrogate",
+   "direction": "request",
+   "signature": "async fn f(a: f64, b: String) -> Result<..>",
+   "args": "(2.5, \"x\")",
+   "contentType": "application/json",
+   "body": "[2.5,\"x\"]",
+   "expect": {
+    "status": 200
+   },
+   "$note": "For a scalar the dehydrated surrogate IS the plain JSON value, so this vector's body is identical to serde-two-args'. The two wires differ in the media type, in the zero-argument spelling, and in what a NON-scalar dehydrates to -- not in this row.",
+   "derived": true
+  },
+  {
+   "id": "response-scalar",
+   "wire": "both",
+   "direction": "response",
+   "returns": "Result<f64>",
+   "value": "6.0",
+   "status": 200,
+   "contentType": "application/json",
+   "body": "6.0",
+   "pinnedBy": "crates/topcoat-router/src/content/json.rs:138-149"
+  },
+  {
+   "id": "response-string",
+   "wire": "both",
+   "direction": "response",
+   "returns": "Result<String>",
+   "value": "\"ok\"",
+   "status": 200,
+   "contentType": "application/json",
+   "body": "\"ok\"",
+   "$note": "A JSON string, quotes included -- not text/plain. The response is Json(R) whatever R is.",
+   "derived": true
+  },
+  {
+   "id": "response-unit",
+   "wire": "both",
+   "direction": "response",
+   "returns": "Result<()>",
+   "value": "()",
+   "status": 200,
+   "contentType": "application/json",
+   "body": "null",
+   "$note": "A procedure that returns nothing still answers with a JSON body. There is no 204 path.",
+   "derived": true
+  },
+  {
+   "id": "response-struct",
+   "wire": "serde",
+   "direction": "response",
+   "returns": "Result<Output> where Output { ok: bool }",
+   "value": "Output { ok: true }",
+   "status": 200,
+   "contentType": "application/json",
+   "body": "{\"ok\":true}",
+   "derived": true
+  },
+  {
+   "id": "method-not-post",
+   "wire": "both",
+   "direction": "request",
+   "method": "GET",
+   "expect": {
+    "status": 405
+   },
+   "$why": "ProcedureRoute answers Methods::Only(&[Method::POST]).",
+   "pinnedBy": "crates/topcoat-runtime/src/procedure.rs:184-187",
+   "derived": true
+  },
+  {
+   "id": "unknown-procedure-id",
+   "wire": "both",
+   "direction": "request",
+   "path": "/_topcoat/procedures/not-a-real-id",
+   "expect": {
+    "status": 404
+   },
+   "$why": "Nothing is mounted at that path, so it is an ordinary router miss.",
+   "derived": true
+  }
+ ]
+}

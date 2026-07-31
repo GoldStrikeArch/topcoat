@@ -5,17 +5,39 @@ use topcoat_core::context::Cx;
 use topcoat_view::{NodeViewParts, PartsWriter};
 use uuid::Uuid;
 
+use crate::id::Id;
 use crate::{Surrogate, Surrogated};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct SignalId(Uuid);
+/// The identity a signal is registered under on the client.
+///
+/// Inside an island the id is derived from the island instance and the signal's
+/// position in it, so a client that walks the same view predicts it. Everywhere
+/// else it is random, because nothing has to guess it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SignalId(Id);
 
 impl SignalId {
+    /// A fresh id that no other signal shares.
     #[inline]
     #[must_use]
     pub fn new() -> Self {
-        Self(Uuid::new_v4())
+        Self(Id::Random(Uuid::new_v4()))
+    }
+
+    /// The id for the next signal declared while rendering `cx`.
+    ///
+    /// Signals are numbered by the order they are declared in, which the server
+    /// and the client agree on because a view renders as a sequential chain of
+    /// awaits.
+    #[must_use]
+    pub fn next(cx: &Cx) -> Self {
+        match cx.islands().current() {
+            Some(island) => Self(Id::Island {
+                instance: island.instance(),
+                ordinal: island.next_signal(),
+            }),
+            None => Self::new(),
+        }
     }
 }
 
@@ -29,6 +51,24 @@ impl Default for SignalId {
 impl std::fmt::Display for SignalId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+impl Serialize for SignalId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for SignalId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Id::deserialize(deserializer).map(Self)
     }
 }
 
@@ -47,6 +87,16 @@ impl<T> Signal<T> {
         }
     }
 
+    /// Creates a signal whose id is numbered against the island `cx` is
+    /// rendering, or random outside every island.
+    #[inline]
+    pub fn new_in(cx: &Cx, value: T) -> Self {
+        Self {
+            id: SignalId::next(cx),
+            value,
+        }
+    }
+
     pub(crate) fn id(&self) -> SignalId {
         self.id
     }
@@ -60,7 +110,16 @@ impl<T> Signal<T>
 where
     T: Clone,
 {
-    pub(crate) fn get(&self) -> T {
+    /// The value the signal was declared with.
+    ///
+    /// The server renders a view once, so this is what the view is rendered
+    /// from. It is public because a view reads a signal in two kinds of place: a
+    /// runtime expression, which reads it through the surrogate that also
+    /// compiles to a browser read, and plain Rust such as a `for` loop's
+    /// iterable, which is compiled by whatever compiler is reading the view and
+    /// sees the signal itself.
+    #[must_use]
+    pub fn get(&self) -> T {
         self.value.clone()
     }
 }
@@ -79,7 +138,7 @@ where
     for<'a> &'a T: Surrogated,
     for<'a> <&'a T as Surrogated>::Surrogate: Serialize,
 {
-    fn into_view_parts(self, _cx: &Cx, parts: &mut PartsWriter<'_>) {
+    fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         #[derive(Serialize)]
         struct SignalDeclarationPayload<'a, V>
         where
@@ -88,6 +147,12 @@ where
             t: &'static str,
             id: std::string::String,
             v: &'a V,
+        }
+
+        // Inside an island the declaration is the island's to make, and the
+        // comment this would write would be a node its client does not expect.
+        if crate::in_island(cx) {
+            return;
         }
 
         let value = (&self.0.value).into_surrogate();
@@ -242,5 +307,48 @@ mod tests {
         assert!(html.contains("--&gt;"));
         // The JSON's own quotes round-trip as entities the client decodes.
         assert!(html.contains("&quot;"));
+    }
+
+    #[test]
+    fn ids_outside_an_island_stay_random() {
+        let cx = Cx::default();
+        let first = Signal::new_in(&cx, 0).id();
+        let second = Signal::new_in(&cx, 0).id();
+
+        assert_ne!(first, second);
+        assert_eq!(first.to_string().len(), 36, "{first}");
+    }
+
+    #[test]
+    fn ids_inside_an_island_are_numbered_by_declaration_order() {
+        let cx = Cx::default();
+        let _island = cx.islands().enter(cx.islands().next_instance());
+
+        assert_eq!(Signal::new_in(&cx, 0).id().to_string(), "i0.0");
+        assert_eq!(Signal::new_in(&cx, 0).id().to_string(), "i0.1");
+    }
+
+    #[test]
+    fn each_island_numbers_its_signals_from_zero() {
+        let cx = Cx::default();
+        {
+            let _first = cx.islands().enter(cx.islands().next_instance());
+            assert_eq!(Signal::new_in(&cx, 0).id().to_string(), "i0.0");
+        }
+        let _second = cx.islands().enter(cx.islands().next_instance());
+        assert_eq!(Signal::new_in(&cx, 0).id().to_string(), "i1.0");
+    }
+
+    #[test]
+    fn both_kinds_of_id_round_trip_through_json() {
+        let cx = Cx::default();
+        for id in [SignalId::new(), {
+            let _island = cx.islands().enter(cx.islands().next_instance());
+            SignalId::next(&cx)
+        }] {
+            let json = serde_json::to_string(&id).unwrap();
+            assert_eq!(json, format!("\"{id}\""));
+            assert_eq!(serde_json::from_str::<SignalId>(&json).unwrap(), id);
+        }
     }
 }

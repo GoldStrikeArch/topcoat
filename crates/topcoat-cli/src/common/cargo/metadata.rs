@@ -65,4 +65,52 @@ impl Metadata {
             })
             .collect()
     }
+
+    /// Every package the query returned, in the order cargo listed them.
+    #[cfg(feature = "client")]
+    pub fn packages(&self) -> impl Iterator<Item = Package<'_>> {
+        self.0["packages"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(Package)
+    }
+}
+
+/// One package of a [`Metadata`] query.
+//
+// Only the client build reads a package's own fields; the rest of the CLI works
+// off the whole query.
+#[cfg(feature = "client")]
+#[derive(Clone, Copy)]
+pub struct Package<'a>(pub(crate) &'a serde_json::Value);
+
+#[cfg(feature = "client")]
+impl Package<'_> {
+    /// The package name.
+    pub fn name(&self) -> &str {
+        self.0["name"].as_str().unwrap_or_default()
+    }
+
+    /// The directory holding the package's manifest.
+    pub fn manifest_dir(&self) -> Option<&Path> {
+        Path::new(self.0["manifest_path"].as_str()?).parent()
+    }
+
+    /// The `[package.metadata]` table, which cargo passes through untouched.
+    pub fn metadata(&self) -> &serde_json::Value {
+        &self.0["metadata"]
+    }
+
+    /// Where the build dependency named `name` lives, when the package has it
+    /// as a path dependency.
+    pub fn build_dependency_dir(&self, name: &str) -> Option<&Path> {
+        self.0["dependencies"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|dependency| dependency["kind"] == "build")
+            .filter(|dependency| dependency["name"] == name)
+            .find_map(|dependency| Some(Path::new(dependency["path"].as_str()?)))
+    }
 }

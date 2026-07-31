@@ -3,6 +3,11 @@ use quote::{ToTokens, quote};
 use syn::{Expr, Ident, Pat};
 use topcoat_core_grammar::paths::{topcoat_error, topcoat_view};
 
+use crate::attributes::Attributes;
+use crate::view::Node;
+#[cfg(feature = "dom")]
+use crate::view::{KeySite, SharedKeyCursor, walk_attributes};
+
 /// AST nodes that can emit themselves into a [`ViewWriter`].
 pub(crate) trait WriteView {
     fn write(&self, writer: &mut ViewWriter);
@@ -16,6 +21,9 @@ pub(crate) struct ViewWriter {
     pub(self) chunks: Vec<Chunk>,
     static_segment: String,
     nested: bool,
+    auto_increment: u32,
+    #[cfg(feature = "dom")]
+    keys: KeyState,
 }
 
 impl ViewWriter {
@@ -24,6 +32,9 @@ impl ViewWriter {
             chunks: Vec::new(),
             static_segment: String::new(),
             nested: false,
+            auto_increment: 0,
+            #[cfg(feature = "dom")]
+            keys: KeyState::default(),
         }
     }
 
@@ -32,7 +43,171 @@ impl ViewWriter {
             chunks: Vec::new(),
             static_segment: String::new(),
             nested: true,
+            auto_increment: 0,
+            #[cfg(feature = "dom")]
+            keys: KeyState::default(),
         }
+    }
+
+    /// Numbers the sites this writer emits against `cursor`.
+    ///
+    /// Without a cursor a writer emits no hydration sites at all, which is what
+    /// every build that does not lower views to the DOM does.
+    #[cfg(feature = "dom")]
+    pub fn with_key_cursor(cursor: SharedKeyCursor) -> Self {
+        Self {
+            keys: KeyState {
+                cursor: Some(cursor),
+                element_depth: 0,
+            },
+            ..Self::new()
+        }
+    }
+
+    /// A fresh suffix for a generated identifier, unique within the expansion
+    /// this writer builds. Counting is writer-local, so the same view body
+    /// always produces the same identifiers.
+    pub fn next_auto_increment(&mut self) -> u32 {
+        let increment = self.auto_increment;
+        self.auto_increment += 1;
+        increment
+    }
+
+    /// A writer for a control-flow branch spliced into `self`, seeded so
+    /// generated identifiers keep counting up from the ones already handed out.
+    ///
+    /// A branch is built and dropped as a unit, so it is a template of its own:
+    /// its outermost elements carry keys even though an element of the
+    /// surrounding view is written around them.
+    fn body_writer(&self) -> Self {
+        Self {
+            auto_increment: self.auto_increment,
+            #[cfg(feature = "dom")]
+            keys: self.keys.in_new_template(),
+            ..Self::new()
+        }
+    }
+
+    /// Builds a self-contained view from `f` and returns its tokens, keeping
+    /// the identifier counter shared with `self`.
+    pub fn nested(&mut self, f: impl FnOnce(&mut ViewWriter)) -> TokenStream {
+        let mut nested = Self {
+            auto_increment: self.auto_increment,
+            #[cfg(feature = "dom")]
+            keys: self.keys.in_new_template(),
+            ..Self::new_nested()
+        };
+        f(&mut nested);
+        self.auto_increment = nested.auto_increment;
+        nested.into_token_stream()
+    }
+
+    /// Takes the keys the opening tag of an element consumes and writes the
+    /// element's hydration key when it starts a template.
+    ///
+    /// Only the outermost element of a template carries a key; everything below
+    /// it is found by walking down from it. Call this after the tag name and
+    /// before the attributes, which is where the key belongs in the tag.
+    #[cfg_attr(not(feature = "dom"), allow(clippy::unused_self))]
+    pub fn write_element_key(&mut self, expression_name: bool) {
+        #[cfg(feature = "dom")]
+        {
+            // The key the site takes numbers it for the client emitter; the
+            // server numbers its own as it renders, since only a render knows
+            // which branches it took and how many rows a loop had.
+            if self.keys.element_depth == 0 && self.keys.take(KeySite::TemplateRoot).is_some() {
+                self.statement(quote! {
+                    __parts.push_hydration_site(#topcoat_view::HydrationSite::TemplateRoot);
+                });
+            }
+            if expression_name {
+                self.keys.take(KeySite::ElementName);
+            }
+        }
+        #[cfg(not(feature = "dom"))]
+        let _ = expression_name;
+    }
+
+    /// Takes the keys the control flow inside `attributes` consumes.
+    ///
+    /// Attribute-position control flow is a reactive scope like any other, and
+    /// the keys are numbered in the plan whether or not this writer emits
+    /// anything for them.
+    #[cfg_attr(not(feature = "dom"), allow(clippy::unused_self))]
+    pub fn take_attribute_keys(&mut self, attributes: &Attributes) {
+        #[cfg(feature = "dom")]
+        if let Some(cursor) = &mut self.keys.cursor {
+            walk_attributes(attributes, cursor);
+        }
+        #[cfg(not(feature = "dom"))]
+        let _ = attributes;
+    }
+
+    /// Takes the key a reactive scope consumes: an `if`, `for`, `match`, or a
+    /// `$(...)` expression.
+    #[cfg_attr(not(feature = "dom"), allow(clippy::unused_self))]
+    pub fn take_reactive_scope_key(&mut self) {
+        #[cfg(feature = "dom")]
+        self.keys.take(KeySite::ReactiveScope);
+    }
+
+    /// Takes the key a `signal` declaration consumes.
+    #[cfg_attr(not(feature = "dom"), allow(clippy::unused_self))]
+    pub fn take_signal_key(&mut self) {
+        #[cfg(feature = "dom")]
+        self.keys.take(KeySite::Signal);
+    }
+
+    /// Writes `children` as the children of the element being built.
+    pub fn write_element_children(&mut self, children: &[Node]) {
+        #[cfg(feature = "dom")]
+        {
+            self.keys.element_depth += 1;
+        }
+        self.write_children(children);
+        #[cfg(feature = "dom")]
+        {
+            self.keys.element_depth -= 1;
+        }
+    }
+
+    /// Writes `children` as the whole content of a view.
+    ///
+    /// The children of an element and the nodes of a view are both a list of
+    /// siblings sharing one parent, so both mark their dynamic entries the same
+    /// way.
+    pub fn write_children(&mut self, children: &[Node]) {
+        #[cfg(not(feature = "dom"))]
+        for child in children {
+            child.write(self);
+        }
+
+        // A dynamic child is bracketed by markers so the client can find the
+        // range it owns, but only when it has siblings: a lone child is the
+        // whole content of its parent and needs no delimiting.
+        #[cfg(feature = "dom")]
+        {
+            let mark = self.keys.cursor.is_some()
+                && children.iter().filter(|child| child.is_rendered()).count() > 1;
+            for child in children {
+                let marked = mark && child.is_dynamic();
+                if marked {
+                    self.write_hydration_marker("ChildStart");
+                }
+                child.write(self);
+                if marked {
+                    self.write_hydration_marker("ChildEnd");
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "dom")]
+    fn write_hydration_marker(&mut self, site: &str) {
+        let site = Ident::new(site, Span::call_site());
+        self.statement(quote! {
+            __parts.push_hydration_site(#topcoat_view::HydrationSite::#site);
+        });
     }
 
     pub fn flush(&mut self) {
@@ -85,9 +260,10 @@ impl ViewWriter {
 
     pub fn for_loop(&mut self, pat: &Pat, expr: &Expr, f: impl FnOnce(&mut ViewWriter)) {
         self.flush();
-        let mut body = ViewWriter::new();
+        let mut body = self.body_writer();
         f(&mut body);
         body.flush();
+        self.auto_increment = body.auto_increment;
         self.chunks.push(Chunk::For {
             pat: pat.clone(),
             expr: Box::new(expr.clone()),
@@ -97,11 +273,12 @@ impl ViewWriter {
 
     pub fn if_else(&mut self, expr: &Expr, f: impl FnOnce(&mut ViewWriter, &mut ViewWriter)) {
         self.flush();
-        let mut then_branch = ViewWriter::new();
-        let mut else_branch = ViewWriter::new();
+        let mut then_branch = self.body_writer();
+        let mut else_branch = self.body_writer();
         f(&mut then_branch, &mut else_branch);
         then_branch.flush();
         else_branch.flush();
+        self.auto_increment = then_branch.auto_increment.max(else_branch.auto_increment);
         self.chunks.push(Chunk::If {
             expr: expr.clone(),
             then_branch: Box::new(then_branch),
@@ -111,8 +288,15 @@ impl ViewWriter {
 
     pub fn match_expr(&mut self, expr: &Expr, f: impl FnOnce(&mut MatchArmsBuilder)) {
         self.flush();
-        let mut builder = MatchArmsBuilder { arms: Vec::new() };
+        let mut builder = MatchArmsBuilder {
+            arms: Vec::new(),
+            auto_increment: self.auto_increment,
+            // Every arm is a branch, so each is a template of its own.
+            #[cfg(feature = "dom")]
+            keys: self.keys.in_new_template(),
+        };
         f(&mut builder);
+        self.auto_increment = builder.auto_increment;
         self.chunks.push(Chunk::Match {
             expr: Box::new(expr.clone()),
             arms: builder.arms,
@@ -136,9 +320,21 @@ impl ViewWriter {
                     for chunk in chunks {
                         match chunk {
                             Chunk::Static { string } => {
-                                let helper = ExprKind::Unescaped.helper();
-                                let tokens = quote! { #string };
-                                quote! { #helper(__cx, &mut __parts, #tokens); }
+                                // A view carrying hydration sites can never take
+                                // the fully static path, so its literal markup
+                                // has to render without naming the request
+                                // context, which is not in scope everywhere a
+                                // static view is written today.
+                                #[cfg(feature = "dom")]
+                                {
+                                    quote! { __static(&mut __parts, #string); }
+                                }
+                                #[cfg(not(feature = "dom"))]
+                                {
+                                    let helper = ExprKind::Unescaped.helper();
+                                    let tokens = quote! { #string };
+                                    quote! { #helper(__cx, &mut __parts, #tokens); }
+                                }
                             }
                             Chunk::Expr { kind, tokens } => {
                                 let helper = kind.helper();
@@ -214,11 +410,43 @@ impl ViewWriter {
     }
 }
 
+/// What a [`ViewWriter`] needs to number the sites it writes against a key
+/// plan.
+///
+/// Every builder a writer splits into holds a clone: the cursor is shared, so
+/// the keys keep coming in plan order, while the element depth is per builder so
+/// a body spliced into another view can start templates of its own.
+#[cfg(feature = "dom")]
+#[derive(Clone, Default)]
+struct KeyState {
+    cursor: Option<SharedKeyCursor>,
+    element_depth: usize,
+}
+
+#[cfg(feature = "dom")]
+impl KeyState {
+    fn take(&mut self, site: KeySite) -> Option<crate::view::Key> {
+        self.cursor.as_ref().map(|cursor| cursor.take(site))
+    }
+
+    /// The state for a body that renders a view of its own, so the elements in
+    /// it are template roots rather than descendants of the elements around it.
+    fn in_new_template(&self) -> Self {
+        Self {
+            cursor: self.cursor.clone(),
+            element_depth: 0,
+        }
+    }
+}
+
 /// Identifies which `internal` helper a [`Chunk::Expr`] should be wrapped in
 /// when emitted, so the generated code uses the matching `__*` function and
 /// the corresponding `*ViewParts` trait.
 #[derive(Copy, Clone)]
 pub(crate) enum ExprKind {
+    // Literal markup is written without the request context where a view can
+    // carry hydration sites, so this kind has no emitter there.
+    #[cfg_attr(feature = "dom", allow(dead_code))]
     Unescaped,
     Node,
     View,
@@ -286,13 +514,22 @@ struct MatchArm {
 
 pub(crate) struct MatchArmsBuilder {
     arms: Vec<MatchArm>,
+    auto_increment: u32,
+    #[cfg(feature = "dom")]
+    keys: KeyState,
 }
 
 impl MatchArmsBuilder {
     pub fn arm(&mut self, pat: &Pat, guard: Option<&Expr>, f: impl FnOnce(&mut ViewWriter)) {
-        let mut body = ViewWriter::new();
+        let mut body = ViewWriter {
+            auto_increment: self.auto_increment,
+            #[cfg(feature = "dom")]
+            keys: self.keys.clone(),
+            ..ViewWriter::new()
+        };
         f(&mut body);
         body.flush();
+        self.auto_increment = body.auto_increment;
         self.arms.push(MatchArm {
             pat: pat.clone(),
             guard: guard.cloned(),
@@ -359,9 +596,21 @@ mod tests {
         writer.write_expr(ExprKind::Node, quote! { value });
         writer.write_str_unescaped("</p>");
         let out = rendered(writer);
-        assert!(out.contains("__unescaped (__cx , & mut __parts , \"<p>\")"));
         assert!(out.contains("__node (__cx , & mut __parts , value)"));
-        assert!(out.contains("__unescaped (__cx , & mut __parts , \"</p>\")"));
+
+        // Literal markup renders without the request context only where a view
+        // can carry hydration sites, since those keep it off the fully static
+        // path even when it has no other dynamic content.
+        #[cfg(not(feature = "dom"))]
+        {
+            assert!(out.contains("__unescaped (__cx , & mut __parts , \"<p>\")"));
+            assert!(out.contains("__unescaped (__cx , & mut __parts , \"</p>\")"));
+        }
+        #[cfg(feature = "dom")]
+        {
+            assert!(out.contains("__static (& mut __parts , \"<p>\")"));
+            assert!(out.contains("__static (& mut __parts , \"</p>\")"));
+        }
     }
 
     #[test]

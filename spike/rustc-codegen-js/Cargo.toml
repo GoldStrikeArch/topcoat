@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = [
+    "backend",
+    "jsc-build",
+    "structurizer",
+    "topcoat-dom",
+    "topcoat-js",
+    "view-abi",
+    "view-async",
+    "view-dom",
+    "view-dom-macro",
+    "js-extern-macro",
+    "js-macro",
+]

@@ -21,6 +21,7 @@ pub struct TemplateMatch<B> {
 
 impl<B: WriteView> WriteView for TemplateMatch<B> {
     fn write(&self, writer: &mut ViewWriter) {
+        writer.take_reactive_scope_key();
         writer.match_expr(&self.expr, |arms| {
             for arm in &self.arms {
                 arm.write(arms);

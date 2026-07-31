@@ -1,0 +1,82 @@
+{
+	"$what": "Size baselines for the compiled island chunks, measured on the first green chunked build. `node smoke/budgets.mjs --update` rewrites the sizes and the date; `node smoke/budgets.mjs` checks against them, and so does `node smoke/check.mjs`.",
+	"$howToRead": "`chunk:<name>` is one emitted file. `page:<island>` is what a page carrying only that island downloads: its own chunk plus the shared one, which is the number chunking exists to move. `page:showcase` is the one page carrying more than one island -- life, sand and mines together -- so it is the app's largest JavaScript payload and the only page number not derivable from a single island. A chunk is bigger than the same island's share of one combined module because it carries its own import declarations and compresses on its own; that cost is paid once per island and saved on every island a page does not have.",
+	"$tolerance": "The band a measured gzip size may exceed its baseline by before the budget fails. The emitter's output moves for reasons that are nobody's regression; what a budget catches is the growth that is.",
+	"$whyTheseMoved": "Re-measured on 2026-07-31 for two reasons. The first is a correction: until jsc-build learned to follow `#[path]` module declarations, an island edit did not rerun the build script, so the chunks the previous baseline was stamped from were older than the island sources; `chunk:shared` in particular was missing `Range::contains` and its `RangeBounds` machinery, which `island/life.rs` and `island/mines.rs` have both reached since they were written. `smoke/compiled.mjs` now reads the newest OUT_DIR rather than the first by name, so a stale one cannot be measured again. The second is real growth with a cause: `island/sand.rs` iterates its pointer-event array BY VALUE again, which pulls `core::array::IntoIter` into `chunk:sand` and costs it about 470 raw bytes.",
+	"tolerance": 0.1,
+	"measured": "2026-07-31",
+	"sizes": {
+		"chunk:counter": {
+			"raw": 2821,
+			"gzip": 845
+		},
+		"chunk:nested": {
+			"raw": 3544,
+			"gzip": 1062
+		},
+		"chunk:search": {
+			"raw": 3404,
+			"gzip": 1252
+		},
+		"chunk:dashboard": {
+			"raw": 8152,
+			"gzip": 2137
+		},
+		"chunk:life": {
+			"raw": 25024,
+			"gzip": 5267
+		},
+		"chunk:sand": {
+			"raw": 25768,
+			"gzip": 5349
+		},
+		"chunk:mines": {
+			"raw": 32932,
+			"gzip": 5901
+		},
+		"chunk:bench": {
+			"raw": 12161,
+			"gzip": 3026
+		},
+		"chunk:shared": {
+			"raw": 9452,
+			"gzip": 2230
+		},
+		"page:counter": {
+			"raw": 12273,
+			"gzip": 2885
+		},
+		"page:nested": {
+			"raw": 12996,
+			"gzip": 3108
+		},
+		"page:search": {
+			"raw": 12856,
+			"gzip": 3106
+		},
+		"page:dashboard": {
+			"raw": 17604,
+			"gzip": 4008
+		},
+		"page:life": {
+			"raw": 34476,
+			"gzip": 6927
+		},
+		"page:sand": {
+			"raw": 35220,
+			"gzip": 6860
+		},
+		"page:mines": {
+			"raw": 42384,
+			"gzip": 7509
+		},
+		"page:bench": {
+			"raw": 21613,
+			"gzip": 4855
+		},
+		"page:showcase": {
+			"raw": 93176,
+			"gzip": 15843
+		}
+	}
+}

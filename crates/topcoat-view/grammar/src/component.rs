@@ -8,7 +8,7 @@ use heck::ToPascalCase;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote, quote_spanned};
 use syn::{
-    FnArg, GenericParam, Lifetime, Pat, ReturnType, Type, TypeParam, TypeReference,
+    FnArg, GenericParam, Ident, Lifetime, Pat, ReturnType, Type, TypeParam, TypeReference,
     ext::IdentExt,
     parse_quote,
     spanned::Spanned,
@@ -18,6 +18,21 @@ use syn::{
 use topcoat_core_grammar::paths::{topcoat_context, topcoat_view, topcoat_view_macro};
 
 use crate::component::{ComponentAttr, ComponentItem};
+
+/// The name of the props struct a component's parameters are declared in.
+///
+/// The component's name in `PascalCase` with `Props` after it, so `button`
+/// becomes `ButtonProps`. Every emitter that builds a component's props names
+/// the struct through this, so the name a call site writes is the name the
+/// declaration produced.
+#[must_use]
+pub fn props_ident(ident: &Ident) -> Ident {
+    format_ident!(
+        "{}Props",
+        ident.unraw().to_string().to_pascal_case(),
+        span = ident.span()
+    )
+}
 
 /// A parsed `#[component] async fn ...`. Expands into:
 ///
@@ -65,11 +80,7 @@ impl ToTokens for Component {
         let mut generics = item.sig.generics.clone();
         let vis = &item.vis;
         let ident = &item.sig.ident;
-        let props_ident = format_ident!(
-            "{}Props",
-            ident.unraw().to_string().to_pascal_case(),
-            span = ident.span()
-        );
+        let props_ident = props_ident(ident);
 
         let attrs = item.attrs;
         item.attrs = vec![];

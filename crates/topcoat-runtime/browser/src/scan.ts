@@ -11,6 +11,34 @@ type PendingTextExpression = {
 };
 
 /**
+ * The element an island renders inside.
+ *
+ * An island brings its own client runtime and hydrates itself from the
+ * hydration keys the server wrote, so this runtime must leave everything under
+ * one alone. Both would otherwise bind the same nodes.
+ */
+export const ISLAND_TAG = "topcoat-island";
+
+function isIsland(node: Node): boolean {
+	return (
+		node.nodeType === Node.ELEMENT_NODE &&
+		(node as Element).localName === ISLAND_TAG
+	);
+}
+
+/**
+ * Keeps island subtrees out of the walk.
+ *
+ * `FILTER_REJECT` in a `TreeWalker` skips the node and everything below it, so
+ * an island's markers are never even looked at, let alone consumed.
+ */
+const skipIslands: NodeFilter = {
+	acceptNode(node: Node): number {
+		return isIsland(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+	},
+};
+
+/**
  * Walks the DOM region `(from, to)` under `root`, hydrating signals, reactive
  * scopes, and element bindings into the provided initial scope.
  *
@@ -26,9 +54,14 @@ export function scan(
 	to: Node | null,
 	initialScope: Scope,
 ): void {
+	// A filter is never applied to the root itself, so an island passed as the
+	// root has to be turned away here.
+	if (isIsland(root)) return;
+
 	const walker = document.createTreeWalker(
 		root,
 		NodeFilter.SHOW_COMMENT | NodeFilter.SHOW_ELEMENT,
+		skipIslands,
 	);
 	if (from) walker.currentNode = from;
 

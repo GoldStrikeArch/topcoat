@@ -1,15 +1,69 @@
 use std::{hash::Hash, marker::PhantomData, pin::Pin};
 
 use ref_cast::RefCast;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use topcoat_core::{context::Cx, error::Result};
 use topcoat_router::{
-    Body, Method, Methods, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder,
+    Body, FromRequest, Method, Methods, Path, PathBuf, Response, Route, RouteFuture, RouterBuilder,
+    content::Json, content_type, error::bad_request,
 };
 
 use crate::Surrogated;
 
 const PROCEDURE_ROUTE_PREFIX: &str = "/_topcoat/procedures";
+
+/// The media type a client sends serde-encoded call arguments with.
+///
+/// A procedure serves one wire format, and this is the one a client compiled to
+/// the browser target uses: the arguments as a plain JSON array, each encoded by
+/// its own [`Serialize`] implementation. The browser runtime that calls a
+/// procedure from a runtime expression sends `application/json` instead, and its
+/// arguments are encoded as surrogates, so the two are told apart by the media
+/// type rather than by guessing at the body.
+pub const SERDE_CONTENT_TYPE: &str = "application/topcoat+json";
+
+/// Decodes a call's arguments from a serde-encoded request body.
+///
+/// `A` is the argument tuple: a call with one argument sends `[value]` and
+/// decodes into `(T,)`. A call with no arguments sends `[]` and decodes into
+/// `[(); 0]`, because an empty tuple is not an empty JSON array to serde: it is
+/// `null`.
+///
+/// # Errors
+///
+/// Returns a bad-request error if the body was not sent as
+/// [`SERDE_CONTENT_TYPE`], or if it does not decode into `A`.
+pub async fn serde_args<A>(cx: &Cx, body: Body) -> Result<A>
+where
+    A: DeserializeOwned,
+{
+    if !is_serde_content_type(content_type(cx)) {
+        return Err(bad_request(format!(
+            "expected request with `Content-Type: {SERDE_CONTENT_TYPE}`"
+        ))
+        .into());
+    }
+
+    // The JSON body itself is read through the same extractor every other JSON
+    // endpoint uses, so a malformed body is reported the same way, with the path
+    // into the value that failed.
+    let Json(args) = <Json<A> as FromRequest>::from_request(cx, body).await?;
+    Ok(args)
+}
+
+/// Whether `content_type` is [`SERDE_CONTENT_TYPE`], ignoring any parameters
+/// after it and the case of the media type itself.
+fn is_serde_content_type(content_type: Option<&str>) -> bool {
+    let Some(content_type) = content_type else {
+        return false;
+    };
+    let media_type = content_type
+        .split(';')
+        .next()
+        .unwrap_or_default()
+        .trim_ascii();
+    media_type.eq_ignore_ascii_case(SERDE_CONTENT_TYPE)
+}
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -213,5 +267,103 @@ impl<A, R> Serialize for ProcedureSurrogate<A, R> {
             id: self.0.id(),
         }
         .serialize(serializer)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use http::{Request, header::CONTENT_TYPE};
+    use topcoat_core::context::CxTestBuilder;
+    use topcoat_router::error::BadRequestError;
+
+    use super::*;
+
+    /// Builds a `Cx` carrying request parts with the given `Content-Type`.
+    fn cx_with_content_type(content_type: Option<&str>) -> Cx {
+        let mut builder = Request::builder();
+        if let Some(content_type) = content_type {
+            builder = builder.header(CONTENT_TYPE, content_type);
+        }
+        let (parts, ()) = builder.body(()).expect("the request builds").into_parts();
+        CxTestBuilder::new().request_context(parts).build()
+    }
+
+    #[test]
+    fn the_serde_media_type_is_recognized_with_parameters_and_in_any_case() {
+        assert!(is_serde_content_type(Some(SERDE_CONTENT_TYPE)));
+        assert!(is_serde_content_type(Some(
+            "application/topcoat+json; charset=utf-8"
+        )));
+        assert!(is_serde_content_type(Some("Application/Topcoat+JSON")));
+        assert!(is_serde_content_type(Some(" application/topcoat+json ")));
+    }
+
+    #[test]
+    fn the_wire_the_browser_runtime_sends_is_not_the_serde_wire() {
+        // The two wires carry different encodings of the same arguments, so
+        // telling them apart is the whole point of the media type.
+        assert!(!is_serde_content_type(Some("application/json")));
+        assert!(!is_serde_content_type(None));
+        assert!(!is_serde_content_type(Some("text/plain")));
+        assert!(!is_serde_content_type(Some("application/topcoat")));
+    }
+
+    #[tokio::test]
+    async fn serde_args_decodes_an_argument_array() {
+        let cx = cx_with_content_type(Some(SERDE_CONTENT_TYPE));
+        let args: (f64, String) = serde_args(&cx, Body::from(r#"[2.5,"x"]"#))
+            .await
+            .expect("a valid argument array");
+
+        assert_eq!(args, (2.5, "x".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn serde_args_decodes_no_arguments_from_an_empty_array() {
+        let cx = cx_with_content_type(Some(SERDE_CONTENT_TYPE));
+        let args: [(); 0] = serde_args(&cx, Body::from("[]"))
+            .await
+            .expect("an empty argument array");
+
+        assert_eq!(args, []);
+    }
+
+    #[tokio::test]
+    async fn serde_args_rejects_the_zero_argument_body_of_the_other_wire() {
+        // The browser runtime sends `null` for a call with no arguments; the
+        // serde wire sends `[]`. The asymmetry is deliberate and unshared, so it
+        // is worth pinning that each wire rejects the other's spelling.
+        let cx = cx_with_content_type(Some(SERDE_CONTENT_TYPE));
+        let error = serde_args::<[(); 0]>(&cx, Body::from("null"))
+            .await
+            .expect_err("`null` is not an empty argument array");
+
+        assert!(error.downcast_ref::<BadRequestError>().is_some());
+    }
+
+    #[tokio::test]
+    async fn serde_args_rejects_a_body_sent_as_the_other_wire() {
+        for content_type in [None, Some("application/json")] {
+            let cx = cx_with_content_type(content_type);
+            let error = serde_args::<(f64,)>(&cx, Body::from("[1.0]"))
+                .await
+                .expect_err("the serde wire is asked for by media type");
+
+            assert!(error.downcast_ref::<BadRequestError>().is_some());
+            assert!(
+                error.to_string().contains(SERDE_CONTENT_TYPE),
+                "the error names the media type it wanted: {error}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn serde_args_reports_where_an_argument_failed_to_decode() {
+        let cx = cx_with_content_type(Some(SERDE_CONTENT_TYPE));
+        let error = serde_args::<(f64, String)>(&cx, Body::from("[2.5,7]"))
+            .await
+            .expect_err("a number is not a string");
+
+        assert!(error.downcast_ref::<BadRequestError>().is_some());
     }
 }

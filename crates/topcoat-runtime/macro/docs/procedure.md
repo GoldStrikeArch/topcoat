@@ -61,6 +61,60 @@ async fn search(cx: &Cx, query: String) -> Result<String> {
 
 Awaiting a call yields the procedure's `Ok` value directly. An `Err` becomes an error response, and the expression awaiting the call fails in the browser without a value; the error itself is not observable from the expression. If the client needs to react to failures, return the outcome as data instead, for example with an `Ok` type of `Result<String, String>`.
 
+# Calling Procedures From Compiled Client Code
+
+A procedure written as `#[procedure(serde)]` is called from client code that is compiled to the browser target, rather than from a runtime expression. Its arguments and its result cross as plain JSON, encoded by their own `Serialize` and `Deserialize` implementations, so they do not have to belong to the shared vocabulary of [`expr!`]:
+
+```rust
+use serde::{Deserialize, Serialize};
+use topcoat::{Result, runtime::procedure};
+
+#[derive(Serialize, Deserialize)]
+struct Match {
+    title: String,
+    score: f64,
+}
+
+#[procedure(serde)]
+async fn search(query: String) -> Result<Vec<Match>> {
+    // Query the database, score the rows, ...
+#   let _ = query;
+    Ok(Vec::new())
+}
+```
+
+The declaration compiles to one half per target. The server keeps the function body and the route. A crate compiled for the client instead gets a plain async function of the same name, taking the same arguments, which calls the procedure and resolves to its `Ok` value:
+
+```text
+let matches = search("topcoat".to_owned()).await?;
+```
+
+Because the body belongs to the server half alone, server-only code inside it never has to compile for the client.
+
+A call takes a network round trip, so it only ever happens from somewhere that runs after the view is built: an event handler, or an effect. Building the view itself must not wait for one. That is a property of taking over server-rendered markup rather than a limitation of procedures: the client claims the nodes the server wrote in a single pass, and a pause in the middle of that pass ends it, leaving the client to build the whole subtree again from nothing.
+
+A crate that declares a procedure this way says so in its manifest, since the two halves are selected by a cfg name:
+
+```toml
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(topcoat_client)'] }
+```
+
+## One Wire Per Procedure
+
+A procedure serves one of the two wires, and which one is written on the declaration:
+
+| declaration | called from | request `Content-Type` | arguments |
+|---|---|---|---|
+| `#[procedure]` | a runtime expression | `application/json` | the shared vocabulary's encoding |
+| `#[procedure(serde)]` | compiled client code | `application/topcoat+json` | plain JSON, one value per argument |
+
+A call that asks for the wrong wire is refused rather than decoded as if the two encodings were the same. The media type is what tells them apart, because the two bodies are both JSON: a call to a `#[procedure(serde)]` function that arrives without `Content-Type: application/topcoat+json` is answered with a bad-request error naming the media type it wanted.
+
+Serving one wire is what frees the argument types: accepting both in one function would require every argument to belong to the shared vocabulary as well, which is the requirement the serde wire exists to lift. A procedure that both a runtime expression and compiled client code have to call is therefore declared twice, with the runtime-expression one calling the other's body.
+
+The two wires also spell an empty argument list differently, and neither accepts the other's spelling: a call with no arguments sends `null` on the runtime-expression wire and `[]` on the serde wire.
+
 # Registration
 
 Each procedure is served by a route on the [`Router`]. `.discover()` registers every procedure linked into the binary; alternatively, mount procedures individually:

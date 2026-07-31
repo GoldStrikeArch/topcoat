@@ -30,6 +30,9 @@ pub mod context;
 #[cfg(feature = "datastar")]
 pub mod datastar;
 
+#[cfg(feature = "dom")]
+pub mod dom;
+
 #[cfg(feature = "font")]
 pub mod font;
 

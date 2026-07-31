@@ -26,12 +26,13 @@ pub struct SignalDeclaration {
 
 impl WriteView for SignalDeclaration {
     fn write(&self, writer: &mut ViewWriter) {
+        writer.take_signal_key();
         let ident = &self.ident;
         let expr = &self.expr;
         writer.local_binding(&parse_quote! { #ident }, expr);
         writer.local_binding(
             &parse_quote! { #ident },
-            &parse_quote! { &#topcoat_runtime::Signal::new(#ident) },
+            &parse_quote! { &#topcoat_runtime::Signal::new_in(__cx, #ident) },
         );
         writer.write_expr(
             ExprKind::Node,

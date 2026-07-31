@@ -9,4 +9,5 @@ pub mod cursor;
 pub mod error;
 pub mod fnv1a;
 pub mod internal;
+pub mod island;
 pub mod memoize;

@@ -31,6 +31,10 @@ where
 {
     #[inline]
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        // A handler inside an island is bound by the island's own client.
+        if crate::in_island(cx) {
+            return;
+        }
         Attribute::new(
             (Unescaped::new_unchecked("data-topcoat-on:"), self.key),
             self.value.js,

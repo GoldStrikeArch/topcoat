@@ -143,6 +143,14 @@ fn crate_base(package: &str) -> Option<String> {
 #[allow(non_upper_case_globals)]
 pub const topcoat_asset: Crate = Crate::new("asset", "topcoat-asset", "");
 
+/// `::topcoat::dom`, or `topcoat_dom` standalone: the support a view compiled
+/// for the DOM calls into.
+///
+/// A crate compiled for the client resolves this to the client-side crate of
+/// that name, which is distributed with the compiler that reads the client ABI.
+#[allow(non_upper_case_globals)]
+pub const topcoat_dom: Crate = Crate::new("dom", "topcoat-dom", "");
+
 /// `::topcoat::context`, or `topcoat_core::context` standalone.
 #[allow(non_upper_case_globals)]
 pub const topcoat_context: Crate = Crate::new("context", "topcoat-core", "context");

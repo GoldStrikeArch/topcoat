@@ -40,6 +40,12 @@ pub mod internal {
         PartsWriter::new(parts, HtmlContext::Unescaped).push_str(s);
     }
 
+    /// Appends literal markup, which needs no request context to render.
+    #[inline]
+    pub fn __static(parts: &mut ViewParts, s: &'static str) {
+        PartsWriter::new(parts, HtmlContext::Unescaped).push_str(s);
+    }
+
     #[inline]
     pub fn __view(_cx: &Cx, parts: &mut ViewParts, view: View) {
         parts.push_view(view);

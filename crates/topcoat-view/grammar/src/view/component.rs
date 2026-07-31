@@ -82,11 +82,9 @@ impl WriteView for Component {
             quote! { .#ident(#value) }
         });
         let child = (!self.children.is_empty()).then(|| {
-            let mut child_writer = ViewWriter::new_nested();
-            for child in &self.children {
-                child.write(&mut child_writer);
-            }
-            let child = child_writer.into_token_stream();
+            let child = writer.nested(|child_writer| {
+                child_writer.write_children(&self.children);
+            });
             quote_spanned! {self.paren_token.span.span()=>
                 .child(#child)
             }

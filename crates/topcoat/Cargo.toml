@@ -72,6 +72,11 @@ datastar = [
 	"dep:topcoat-datastar",
 	"sse",
 ]
+dom = [
+	"dep:topcoat-dom",
+	"view",
+	"topcoat-view-macro/dom",
+]
 discover = [
 	"dep:inventory",
 	"topcoat-font?/discover",
@@ -173,6 +178,7 @@ topcoat-cookie = { workspace = true, optional = true }
 topcoat-core.workspace = true
 topcoat-core-macro.workspace = true
 topcoat-datastar = { workspace = true, optional = true }
+topcoat-dom = { workspace = true, optional = true }
 topcoat-font = { workspace = true, optional = true }
 topcoat-font-macro = { workspace = true, optional = true }
 topcoat-htmx = { workspace = true, optional = true }
@@ -200,6 +206,7 @@ tokio-tungstenite = { workspace = true, optional = true, features = ["connect"] 
 [dev-dependencies]
 futures-core.workspace = true
 futures-util.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 uuid = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

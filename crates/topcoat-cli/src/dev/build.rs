@@ -75,6 +75,14 @@ impl Drop for BuildTask {
 /// Returns the path of the built executable, or `None` after reporting the
 /// failure to the terminal.
 async fn build(kind: BuildKind, opts: BuildOpts) -> Option<PathBuf> {
+    // Before cargo runs: a client crate is compiled by the project's build
+    // script, which needs a prepared spike checkout to do it. Preparing it here
+    // is what lets the project be built with a stable toolchain.
+    #[cfg(feature = "client")]
+    if !crate::client::prepare(opts.package.as_deref()).await {
+        return None;
+    }
+
     let label = kind.label();
     let spinner = Spinner::new(label);
     let progress = spinner.bar();

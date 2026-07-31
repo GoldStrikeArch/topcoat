@@ -1,0 +1,1905 @@
+{
+ "$generatedBy": "distilled from spike/rustc-codegen-js/contract/fixtures/keys-nested.json",
+ "$doNotEditByHand": "Re-distill from the contract fixture instead. A diff here after a version bump IS the drift report.",
+ "$extractedFrom": {
+  "dom-expressions": "0.40.8",
+  "solid-js": "1.9.14",
+  "babel-plugin-jsx-dom-expressions": "0.40.7",
+  "gitSha": "56bd4054237b031c0cca8c1ec69da162c52ed4a6"
+ },
+ "$what": "Hydration-key allocation ACROSS COMPONENT BOUNDARIES, driven through both real runtimes (dom-expressions client hydration path and solid's SSR renderToString) over the same declarative component trees. The oracle for Topcoat's Formatter::enter_component and for _$createComponent emission.",
+ "$shapeDsl": [
+  "`e` is one hydratable template root, which spends one slot of the context it is in.",
+  "`C(...)` is one component boundary, which spends one slot of the context it is in and renders its body in a context of its own.",
+  "`X*n` repeats X n times. Items separated by spaces are siblings in one context.",
+  "The DSL models key allocation order and scoping, not DOM nesting.",
+  "`C{...}(...)` is a component boundary called with child content: the items in braces are built as an argument, so they spend slots of the CALLER's context before the boundary spends its own.",
+  "`k` is where a component's body renders the child content it was called with."
+ ],
+ "$elided": "A key list longer than the fixture's limit stores its ends around a `... N elided ...` marker; the head and the tail are still asserted.",
+ "$renderId": "Cases whose root context id was not empty are left out: an island's key prefix is what plays that role in Topcoat, and hydration_keys.json already covers it.",
+ "eagerChildContent": {
+  "$what": "Eager child content: what child content passed as an argument numbers, which is the shape Topcoat has. Solid's getter-shaped children are recorded beside it in the contract fixture and are a documented delta, not a target.",
+  "$source": "The `topcoatShape` rows of keys-nested.json's `getterChildren` table; their `html` field is the oracle, kept here as `oracle`. Rows marked `derived` are not extracted: they apply the fixture's own pinned algorithm to shapes the table does not carry.",
+  "$order": "`keys` is in DOCUMENT order. Eager child content makes that differ from allocation order, because the content is numbered where the call is but written where the component's view puts it.",
+  "rows": [
+   {
+    "name": "eager: the child is a plain prop value, built before the boundary",
+    "shape": "C{e}(e k)",
+    "keys": [
+     "10",
+     "0"
+    ],
+    "oracle": "<div data-hk=\"10\"><span data-hk=\"0\"></span></div>"
+   },
+   {
+    "name": "eager, with a sibling element after the component",
+    "shape": "C{e}(e k) e",
+    "keys": [
+     "10",
+     "0",
+     "2"
+    ],
+    "oracle": "<div data-hk=\"10\"><span data-hk=\"0\"></span></div><span data-hk=\"2\"></span>"
+   },
+   {
+    "name": "child content a body never renders is numbered all the same",
+    "shape": "C{e}(e) e",
+    "keys": [
+     "10",
+     "2"
+    ],
+    "derived": true
+   },
+   {
+    "name": "child content that is itself a component call",
+    "shape": "C{C(e)}(e k)",
+    "keys": [
+     "10",
+     "00"
+    ],
+    "derived": true
+   },
+   {
+    "name": "two child roots spend two of the caller's slots",
+    "shape": "C{e*2}(e k)",
+    "keys": [
+     "20",
+     "0",
+     "1"
+    ],
+    "derived": true
+   },
+   {
+    "name": "child content rendered before the body's own root",
+    "shape": "C{e}(k e)",
+    "keys": [
+     "0",
+     "10"
+    ],
+    "derived": true
+   },
+   {
+    "name": "two calls, each with child content of its own",
+    "shape": "C{e}(e k)*2",
+    "keys": [
+     "10",
+     "0",
+     "30",
+     "2"
+    ],
+    "derived": true
+   },
+   {
+    "name": "a call with child content inside a call with child content",
+    "shape": "C{e}(e C{e}(e k) k)",
+    "keys": [
+     "10",
+     "120",
+     "11",
+     "0"
+    ],
+    "derived": true
+   },
+   {
+    "name": "child content that crosses the caller's letter boundary",
+    "shape": "C{e*10}(e k)",
+    "keys": [
+     "a100",
+     "0",
+     "1",
+     "2",
+     "3",
+     "4",
+     "5",
+     "6",
+     "7",
+     "8",
+     "9"
+    ],
+    "derived": true
+   }
+  ]
+ },
+ "caseCount": 102,
+ "cases": [
+  {
+   "group": "flat",
+   "name": "flat-1",
+   "shape": "e",
+   "elementKeyCount": 1,
+   "elementKeys": [
+    "0"
+   ]
+  },
+  {
+   "group": "flat",
+   "name": "flat-2",
+   "shape": "e*2",
+   "elementKeyCount": 2,
+   "elementKeys": [
+    "0",
+    "1"
+   ]
+  },
+  {
+   "group": "flat",
+   "name": "flat-3",
+   "shape": "e*3",
+   "elementKeyCount": 3,
+   "elementKeys": [
+    "0",
+    "1",
+    "2"
+   ]
+  },
+  {
+   "group": "flat",
+   "name": "flat-10",
+   "shape": "e*10",
+   "elementKeyCount": 10,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9"
+   ]
+  },
+  {
+   "group": "flat",
+   "name": "flat-11",
+   "shape": "e*11",
+   "elementKeyCount": 11,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a10"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad0-inner0",
+   "shape": "C() e",
+   "elementKeyCount": 1,
+   "elementKeys": [
+    "1"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad0-inner1",
+   "shape": "C(e) e",
+   "elementKeyCount": 2,
+   "elementKeys": [
+    "00",
+    "1"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad0-inner2",
+   "shape": "C(e*2) e",
+   "elementKeyCount": 3,
+   "elementKeys": [
+    "00",
+    "01",
+    "1"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad0-inner10",
+   "shape": "C(e*10) e",
+   "elementKeyCount": 11,
+   "elementKeys": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "06",
+    "07",
+    "08",
+    "09",
+    "1"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad0-inner11",
+   "shape": "C(e*11) e",
+   "elementKeyCount": 12,
+   "elementKeys": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "06",
+    "07",
+    "08",
+    "09",
+    "0a10",
+    "1"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad1-inner0",
+   "shape": "e C() e",
+   "elementKeyCount": 2,
+   "elementKeys": [
+    "0",
+    "2"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad1-inner1",
+   "shape": "e C(e) e",
+   "elementKeyCount": 3,
+   "elementKeys": [
+    "0",
+    "10",
+    "2"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad1-inner2",
+   "shape": "e C(e*2) e",
+   "elementKeyCount": 4,
+   "elementKeys": [
+    "0",
+    "10",
+    "11",
+    "2"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad1-inner10",
+   "shape": "e C(e*10) e",
+   "elementKeyCount": 12,
+   "elementKeys": [
+    "0",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "2"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad1-inner11",
+   "shape": "e C(e*11) e",
+   "elementKeyCount": 13,
+   "elementKeys": [
+    "0",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "1a10",
+    "2"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad2-inner0",
+   "shape": "e*2 C() e",
+   "elementKeyCount": 3,
+   "elementKeys": [
+    "0",
+    "1",
+    "3"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad2-inner1",
+   "shape": "e*2 C(e) e",
+   "elementKeyCount": 4,
+   "elementKeys": [
+    "0",
+    "1",
+    "20",
+    "3"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad2-inner2",
+   "shape": "e*2 C(e*2) e",
+   "elementKeyCount": 5,
+   "elementKeys": [
+    "0",
+    "1",
+    "20",
+    "21",
+    "3"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad2-inner10",
+   "shape": "e*2 C(e*10) e",
+   "elementKeyCount": 13,
+   "elementKeys": [
+    "0",
+    "1",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "3"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad2-inner11",
+   "shape": "e*2 C(e*11) e",
+   "elementKeyCount": 14,
+   "elementKeys": [
+    "0",
+    "1",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "2a10",
+    "3"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad9-inner0",
+   "shape": "e*9 C() e",
+   "elementKeyCount": 10,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "a10"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad9-inner1",
+   "shape": "e*9 C(e) e",
+   "elementKeyCount": 11,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "90",
+    "a10"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad9-inner2",
+   "shape": "e*9 C(e*2) e",
+   "elementKeyCount": 12,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "90",
+    "91",
+    "a10"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad9-inner10",
+   "shape": "e*9 C(e*10) e",
+   "elementKeyCount": 20,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "90",
+    "91",
+    "92",
+    "93",
+    "94",
+    "95",
+    "96",
+    "97",
+    "98",
+    "99",
+    "a10"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad9-inner11",
+   "shape": "e*9 C(e*11) e",
+   "elementKeyCount": 21,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "90",
+    "91",
+    "92",
+    "93",
+    "94",
+    "95",
+    "96",
+    "97",
+    "98",
+    "99",
+    "9a10",
+    "a10"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad10-inner0",
+   "shape": "e*10 C() e",
+   "elementKeyCount": 11,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a11"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad10-inner1",
+   "shape": "e*10 C(e) e",
+   "elementKeyCount": 12,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a100",
+    "a11"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad10-inner2",
+   "shape": "e*10 C(e*2) e",
+   "elementKeyCount": 13,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a100",
+    "a101",
+    "a11"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad10-inner10",
+   "shape": "e*10 C(e*10) e",
+   "elementKeyCount": 21,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a100",
+    "a101",
+    "a102",
+    "a103",
+    "a104",
+    "a105",
+    "a106",
+    "a107",
+    "a108",
+    "a109",
+    "a11"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad10-inner11",
+   "shape": "e*10 C(e*11) e",
+   "elementKeyCount": 22,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a100",
+    "a101",
+    "a102",
+    "a103",
+    "a104",
+    "a105",
+    "a106",
+    "a107",
+    "a108",
+    "a109",
+    "a10a10",
+    "a11"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad11-inner0",
+   "shape": "e*11 C() e",
+   "elementKeyCount": 12,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a10",
+    "a12"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad11-inner1",
+   "shape": "e*11 C(e) e",
+   "elementKeyCount": 13,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a10",
+    "a110",
+    "a12"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad11-inner2",
+   "shape": "e*11 C(e*2) e",
+   "elementKeyCount": 14,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a10",
+    "a110",
+    "a111",
+    "a12"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad11-inner10",
+   "shape": "e*11 C(e*10) e",
+   "elementKeyCount": 22,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a10",
+    "a110",
+    "a111",
+    "a112",
+    "a113",
+    "a114",
+    "a115",
+    "a116",
+    "a117",
+    "a118",
+    "a119",
+    "a12"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad11-inner11",
+   "shape": "e*11 C(e*11) e",
+   "elementKeyCount": 23,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a10",
+    "a110",
+    "a111",
+    "a112",
+    "a113",
+    "a114",
+    "a115",
+    "a116",
+    "a117",
+    "a118",
+    "a119",
+    "a11a10",
+    "a12"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad99-inner0",
+   "shape": "e*99 C() e",
+   "elementKeyCount": 100,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 88 elided ...",
+    "a94",
+    "a95",
+    "a96",
+    "a97",
+    "a98",
+    "b100"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad99-inner1",
+   "shape": "e*99 C(e) e",
+   "elementKeyCount": 101,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 89 elided ...",
+    "a95",
+    "a96",
+    "a97",
+    "a98",
+    "a990",
+    "b100"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad99-inner2",
+   "shape": "e*99 C(e*2) e",
+   "elementKeyCount": 102,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 90 elided ...",
+    "a96",
+    "a97",
+    "a98",
+    "a990",
+    "a991",
+    "b100"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad99-inner10",
+   "shape": "e*99 C(e*10) e",
+   "elementKeyCount": 110,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 98 elided ...",
+    "a995",
+    "a996",
+    "a997",
+    "a998",
+    "a999",
+    "b100"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad99-inner11",
+   "shape": "e*99 C(e*11) e",
+   "elementKeyCount": 111,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 99 elided ...",
+    "a996",
+    "a997",
+    "a998",
+    "a999",
+    "a99a10",
+    "b100"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad100-inner0",
+   "shape": "e*100 C() e",
+   "elementKeyCount": 101,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 89 elided ...",
+    "a95",
+    "a96",
+    "a97",
+    "a98",
+    "a99",
+    "b101"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad100-inner1",
+   "shape": "e*100 C(e) e",
+   "elementKeyCount": 102,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 90 elided ...",
+    "a96",
+    "a97",
+    "a98",
+    "a99",
+    "b1000",
+    "b101"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad100-inner2",
+   "shape": "e*100 C(e*2) e",
+   "elementKeyCount": 103,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 91 elided ...",
+    "a97",
+    "a98",
+    "a99",
+    "b1000",
+    "b1001",
+    "b101"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad100-inner10",
+   "shape": "e*100 C(e*10) e",
+   "elementKeyCount": 111,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 99 elided ...",
+    "b1005",
+    "b1006",
+    "b1007",
+    "b1008",
+    "b1009",
+    "b101"
+   ]
+  },
+  {
+   "group": "one-component",
+   "name": "pad100-inner11",
+   "shape": "e*100 C(e*11) e",
+   "elementKeyCount": 112,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 100 elided ...",
+    "b1006",
+    "b1007",
+    "b1008",
+    "b1009",
+    "b100a10",
+    "b101"
+   ]
+  },
+  {
+   "group": "siblings",
+   "name": "two-components",
+   "shape": "C(e)*2",
+   "elementKeyCount": 2,
+   "elementKeys": [
+    "00",
+    "10"
+   ]
+  },
+  {
+   "group": "siblings",
+   "name": "component-element-component",
+   "shape": "C(e) e C(e)",
+   "elementKeyCount": 3,
+   "elementKeys": [
+    "00",
+    "1",
+    "20"
+   ]
+  },
+  {
+   "group": "siblings",
+   "name": "element-around",
+   "shape": "e C(e)*2 e",
+   "elementKeyCount": 4,
+   "elementKeys": [
+    "0",
+    "10",
+    "20",
+    "3"
+   ]
+  },
+  {
+   "group": "siblings",
+   "name": "three-components",
+   "shape": "C(e)*3",
+   "elementKeyCount": 3,
+   "elementKeys": [
+    "00",
+    "10",
+    "20"
+   ]
+  },
+  {
+   "group": "siblings",
+   "name": "empty-then-component",
+   "shape": "C() C(e)",
+   "elementKeyCount": 1,
+   "elementKeys": [
+    "10"
+   ]
+  },
+  {
+   "group": "siblings",
+   "name": "eleven-components",
+   "shape": "C(e)*11",
+   "elementKeyCount": 11,
+   "elementKeys": [
+    "00",
+    "10",
+    "20",
+    "30",
+    "40",
+    "50",
+    "60",
+    "70",
+    "80",
+    "90",
+    "a100"
+   ]
+  },
+  {
+   "group": "siblings",
+   "name": "eleven-components-then-element",
+   "shape": "C(e)*11 e",
+   "elementKeyCount": 12,
+   "elementKeys": [
+    "00",
+    "10",
+    "20",
+    "30",
+    "40",
+    "50",
+    "60",
+    "70",
+    "80",
+    "90",
+    "a100",
+    "a11"
+   ]
+  },
+  {
+   "group": "siblings",
+   "name": "component-pairs-interleaved",
+   "shape": "C(e*2) e C(e*2) e C(e*2)",
+   "elementKeyCount": 8,
+   "elementKeys": [
+    "00",
+    "01",
+    "1",
+    "20",
+    "21",
+    "3",
+    "40",
+    "41"
+   ]
+  },
+  {
+   "group": "depth",
+   "name": "chain-2",
+   "shape": "C(e C(e)) e",
+   "elementKeyCount": 3,
+   "elementKeys": [
+    "00",
+    "010",
+    "1"
+   ]
+  },
+  {
+   "group": "depth",
+   "name": "chain-3",
+   "shape": "C(e C(e C(e))) e",
+   "elementKeyCount": 4,
+   "elementKeys": [
+    "00",
+    "010",
+    "0110",
+    "1"
+   ]
+  },
+  {
+   "group": "depth",
+   "name": "chain-4",
+   "shape": "C(e C(e C(e C(e)))) e",
+   "elementKeyCount": 5,
+   "elementKeys": [
+    "00",
+    "010",
+    "0110",
+    "01110",
+    "1"
+   ]
+  },
+  {
+   "group": "depth",
+   "name": "chain-5",
+   "shape": "C(e C(e C(e C(e C(e))))) e",
+   "elementKeyCount": 6,
+   "elementKeys": [
+    "00",
+    "010",
+    "0110",
+    "01110",
+    "011110",
+    "1"
+   ]
+  },
+  {
+   "group": "depth",
+   "name": "chain-2-pad10",
+   "shape": "e*10 C(e*10 C(e*11) e) e",
+   "elementKeyCount": 33,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 21 elided ...",
+    "a10a107",
+    "a10a108",
+    "a10a109",
+    "a10a10a10",
+    "a10a11",
+    "a11"
+   ]
+  },
+  {
+   "group": "depth",
+   "name": "chain-2-pad11",
+   "shape": "e*11 C(e*11 C(e*12) e) e",
+   "elementKeyCount": 36,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 24 elided ...",
+    "a11a118",
+    "a11a119",
+    "a11a11a10",
+    "a11a11a11",
+    "a11a12",
+    "a12"
+   ]
+  },
+  {
+   "group": "depth",
+   "name": "chain-3-pad10",
+   "shape": "e*10 C(e*10 C(e*10 C(e*11) e) e) e",
+   "elementKeyCount": 44,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 32 elided ...",
+    "a10a10a108",
+    "a10a10a109",
+    "a10a10a10a10",
+    "a10a10a11",
+    "a10a11",
+    "a11"
+   ]
+  },
+  {
+   "group": "depth",
+   "name": "chain-3-pad11",
+   "shape": "e*11 C(e*11 C(e*11 C(e*12) e) e) e",
+   "elementKeyCount": 48,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 36 elided ...",
+    "a11a11a119",
+    "a11a11a11a10",
+    "a11a11a11a11",
+    "a11a11a12",
+    "a11a12",
+    "a12"
+   ]
+  },
+  {
+   "group": "depth",
+   "name": "chain-3-inner-100",
+   "shape": "C(e*100 C(e*100 C(e*101)))",
+   "elementKeyCount": 301,
+   "elementKeys": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "... 289 elided ...",
+    "0b100b100a95",
+    "0b100b100a96",
+    "0b100b100a97",
+    "0b100b100a98",
+    "0b100b100a99",
+    "0b100b100b100"
+   ]
+  },
+  {
+   "group": "shape",
+   "name": "layout-page-island",
+   "shape": "C(e C(e) e C(e*2) e)",
+   "elementKeyCount": 6,
+   "elementKeys": [
+    "00",
+    "010",
+    "02",
+    "030",
+    "031",
+    "04"
+   ]
+  },
+  {
+   "group": "shape",
+   "name": "component-only-tree",
+   "shape": "C(C(C()))",
+   "elementKeyCount": 0,
+   "elementKeys": []
+  },
+  {
+   "group": "shape",
+   "name": "empty-components-then-element",
+   "shape": "C()*3 e",
+   "elementKeyCount": 1,
+   "elementKeys": [
+    "3"
+   ]
+  },
+  {
+   "group": "shape",
+   "name": "element-then-empty-component",
+   "shape": "e C() e",
+   "elementKeyCount": 2,
+   "elementKeys": [
+    "0",
+    "2"
+   ]
+  },
+  {
+   "group": "shape",
+   "name": "wide-fragment-component",
+   "shape": "C(e*3)*3",
+   "elementKeyCount": 9,
+   "elementKeys": [
+    "00",
+    "01",
+    "02",
+    "10",
+    "11",
+    "12",
+    "20",
+    "21",
+    "22"
+   ]
+  },
+  {
+   "group": "shape",
+   "name": "deep-left-heavy",
+   "shape": "C(C(C(e) e) e) e",
+   "elementKeyCount": 4,
+   "elementKeys": [
+    "0000",
+    "001",
+    "01",
+    "1"
+   ]
+  },
+  {
+   "group": "shape",
+   "name": "deep-right-heavy",
+   "shape": "e C(e C(e C(e)))",
+   "elementKeyCount": 4,
+   "elementKeys": [
+    "0",
+    "10",
+    "110",
+    "1110"
+   ]
+  },
+  {
+   "group": "shape",
+   "name": "component-in-second-slot",
+   "shape": "e C(e*2) e",
+   "elementKeyCount": 4,
+   "elementKeys": [
+    "0",
+    "10",
+    "11",
+    "2"
+   ]
+  },
+  {
+   "group": "shape",
+   "name": "nested-sibling-pairs",
+   "shape": "C(C(e)*2)*2",
+   "elementKeyCount": 4,
+   "elementKeys": [
+    "000",
+    "010",
+    "100",
+    "110"
+   ]
+  },
+  {
+   "group": "shape",
+   "name": "single-component-single-element",
+   "shape": "C(e)",
+   "elementKeyCount": 1,
+   "elementKeys": [
+    "00"
+   ]
+  },
+  {
+   "group": "renderId",
+   "name": "renderId-empty",
+   "shape": "e C(e C(e) e) e",
+   "elementKeyCount": 5,
+   "elementKeys": [
+    "0",
+    "10",
+    "110",
+    "12",
+    "2"
+   ]
+  },
+  {
+   "group": "boundary",
+   "name": "boundary-pad9-inner10",
+   "shape": "e*9 C(e*10) e",
+   "elementKeyCount": 20,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "90",
+    "91",
+    "92",
+    "93",
+    "94",
+    "95",
+    "96",
+    "97",
+    "98",
+    "99",
+    "a10"
+   ]
+  },
+  {
+   "group": "boundary",
+   "name": "boundary-pad9-inner100",
+   "shape": "e*9 C(e*100) e",
+   "elementKeyCount": 110,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 98 elided ...",
+    "9a95",
+    "9a96",
+    "9a97",
+    "9a98",
+    "9a99",
+    "a10"
+   ]
+  },
+  {
+   "group": "boundary",
+   "name": "boundary-pad10-inner10",
+   "shape": "e*10 C(e*10) e",
+   "elementKeyCount": 21,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "a100",
+    "a101",
+    "a102",
+    "a103",
+    "a104",
+    "a105",
+    "a106",
+    "a107",
+    "a108",
+    "a109",
+    "a11"
+   ]
+  },
+  {
+   "group": "boundary",
+   "name": "boundary-pad10-inner100",
+   "shape": "e*10 C(e*100) e",
+   "elementKeyCount": 111,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 99 elided ...",
+    "a10a95",
+    "a10a96",
+    "a10a97",
+    "a10a98",
+    "a10a99",
+    "a11"
+   ]
+  },
+  {
+   "group": "boundary",
+   "name": "boundary-pad99-inner10",
+   "shape": "e*99 C(e*10) e",
+   "elementKeyCount": 110,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 98 elided ...",
+    "a995",
+    "a996",
+    "a997",
+    "a998",
+    "a999",
+    "b100"
+   ]
+  },
+  {
+   "group": "boundary",
+   "name": "boundary-pad99-inner100",
+   "shape": "e*99 C(e*100) e",
+   "elementKeyCount": 200,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 188 elided ...",
+    "a99a95",
+    "a99a96",
+    "a99a97",
+    "a99a98",
+    "a99a99",
+    "b100"
+   ]
+  },
+  {
+   "group": "boundary",
+   "name": "boundary-pad100-inner10",
+   "shape": "e*100 C(e*10) e",
+   "elementKeyCount": 111,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 99 elided ...",
+    "b1005",
+    "b1006",
+    "b1007",
+    "b1008",
+    "b1009",
+    "b101"
+   ]
+  },
+  {
+   "group": "boundary",
+   "name": "boundary-pad100-inner100",
+   "shape": "e*100 C(e*100) e",
+   "elementKeyCount": 201,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 189 elided ...",
+    "b100a95",
+    "b100a96",
+    "b100a97",
+    "b100a98",
+    "b100a99",
+    "b101"
+   ]
+  },
+  {
+   "group": "boundary",
+   "name": "boundary-pad999-inner10",
+   "shape": "e*999 C(e*10) e",
+   "elementKeyCount": 1010,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 998 elided ...",
+    "b9995",
+    "b9996",
+    "b9997",
+    "b9998",
+    "b9999",
+    "c1000"
+   ]
+  },
+  {
+   "group": "boundary",
+   "name": "boundary-pad999-inner100",
+   "shape": "e*999 C(e*100) e",
+   "elementKeyCount": 1100,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 1088 elided ...",
+    "b999a95",
+    "b999a96",
+    "b999a97",
+    "b999a98",
+    "b999a99",
+    "c1000"
+   ]
+  },
+  {
+   "group": "boundary",
+   "name": "boundary-pad1000-inner10",
+   "shape": "e*1000 C(e*10) e",
+   "elementKeyCount": 1011,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 999 elided ...",
+    "c10005",
+    "c10006",
+    "c10007",
+    "c10008",
+    "c10009",
+    "c1001"
+   ]
+  },
+  {
+   "group": "boundary",
+   "name": "boundary-pad1000-inner100",
+   "shape": "e*1000 C(e*100) e",
+   "elementKeyCount": 1101,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 1089 elided ...",
+    "c1000a95",
+    "c1000a96",
+    "c1000a97",
+    "c1000a98",
+    "c1000a99",
+    "c1001"
+   ]
+  },
+  {
+   "group": "boundary",
+   "name": "boundary-pad10000-inner1",
+   "shape": "e*10000 C(e) e",
+   "elementKeyCount": 10002,
+   "elementKeys": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "... 9990 elided ...",
+    "c9996",
+    "c9997",
+    "c9998",
+    "c9999",
+    "d100000",
+    "d10001"
+   ]
+  },
+  {
+   "group": "inner-boundary",
+   "name": "inner-pad0",
+   "shape": "C(C(e) e) e",
+   "elementKeyCount": 3,
+   "elementKeys": [
+    "000",
+    "01",
+    "1"
+   ]
+  },
+  {
+   "group": "inner-boundary",
+   "name": "inner-pad1",
+   "shape": "C(e C(e) e) e",
+   "elementKeyCount": 4,
+   "elementKeys": [
+    "00",
+    "010",
+    "02",
+    "1"
+   ]
+  },
+  {
+   "group": "inner-boundary",
+   "name": "inner-pad9",
+   "shape": "C(e*9 C(e) e) e",
+   "elementKeyCount": 12,
+   "elementKeys": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "06",
+    "07",
+    "08",
+    "090",
+    "0a10",
+    "1"
+   ]
+  },
+  {
+   "group": "inner-boundary",
+   "name": "inner-pad10",
+   "shape": "C(e*10 C(e) e) e",
+   "elementKeyCount": 13,
+   "elementKeys": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "06",
+    "07",
+    "08",
+    "09",
+    "0a100",
+    "0a11",
+    "1"
+   ]
+  },
+  {
+   "group": "inner-boundary",
+   "name": "inner-pad11",
+   "shape": "C(e*11 C(e) e) e",
+   "elementKeyCount": 14,
+   "elementKeys": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "06",
+    "07",
+    "08",
+    "09",
+    "0a10",
+    "0a110",
+    "0a12",
+    "1"
+   ]
+  },
+  {
+   "group": "inner-boundary",
+   "name": "inner-pad99",
+   "shape": "C(e*99 C(e) e) e",
+   "elementKeyCount": 102,
+   "elementKeys": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "... 90 elided ...",
+    "0a96",
+    "0a97",
+    "0a98",
+    "0a990",
+    "0b100",
+    "1"
+   ]
+  },
+  {
+   "group": "inner-boundary",
+   "name": "inner-pad100",
+   "shape": "C(e*100 C(e) e) e",
+   "elementKeyCount": 103,
+   "elementKeys": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "... 91 elided ...",
+    "0a97",
+    "0a98",
+    "0a99",
+    "0b1000",
+    "0b101",
+    "1"
+   ]
+  },
+  {
+   "group": "inner-boundary",
+   "name": "inner-pad10-depth3",
+   "shape": "C(e*10 C(e*10 C(e) e) e) e",
+   "elementKeyCount": 24,
+   "elementKeys": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "... 12 elided ...",
+    "0a108",
+    "0a109",
+    "0a10a100",
+    "0a10a11",
+    "0a11",
+    "1"
+   ]
+  },
+  {
+   "group": "inner-boundary",
+   "name": "inner-pad100-depth3",
+   "shape": "C(e*100 C(e*100 C(e) e) e) e",
+   "elementKeyCount": 204,
+   "elementKeys": [
+    "00",
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "... 192 elided ...",
+    "0b100a98",
+    "0b100a99",
+    "0b100b1000",
+    "0b100b101",
+    "0b101",
+    "1"
+   ]
+  },
+  {
+   "group": "inner-boundary",
+   "name": "component-first-in-child-context",
+   "shape": "C(C(C(e) e) e)",
+   "elementKeyCount": 3,
+   "elementKeys": [
+    "0000",
+    "001",
+    "01"
+   ]
+  },
+  {
+   "group": "corpus-07b",
+   "name": "07b-component-in-body",
+   "shape": "C(e C(e))",
+   "elementKeyCount": 2,
+   "elementKeys": [
+    "00",
+    "010"
+   ]
+  },
+  {
+   "group": "corpus-07b",
+   "name": "07b-children-component-eager",
+   "shape": "C(e)*2",
+   "elementKeyCount": 2,
+   "elementKeys": [
+    "00",
+    "10"
+   ]
+  },
+  {
+   "group": "corpus-07b",
+   "name": "07b-children-component-getter",
+   "shape": "C(e C(e))",
+   "elementKeyCount": 2,
+   "elementKeys": [
+    "00",
+    "010"
+   ]
+  },
+  {
+   "group": "corpus-07b",
+   "name": "07b-depth-three",
+   "shape": "C(e C(e C(e)))",
+   "elementKeyCount": 3,
+   "elementKeys": [
+    "00",
+    "010",
+    "0110"
+   ]
+  },
+  {
+   "group": "corpus-07b",
+   "name": "07b-siblings-in-body",
+   "shape": "C(e C(e)*2)",
+   "elementKeyCount": 3,
+   "elementKeys": [
+    "00",
+    "010",
+    "020"
+   ]
+  },
+  {
+   "group": "corpus-07b",
+   "name": "07b-nested-in-element",
+   "shape": "e C(e C(e))",
+   "elementKeyCount": 3,
+   "elementKeys": [
+    "0",
+    "10",
+    "110"
+   ]
+  }
+ ]
+}

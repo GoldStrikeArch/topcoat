@@ -6,7 +6,7 @@ pub use id::*;
 
 use std::{any::Any, ops::Deref, sync::Arc};
 
-use crate::{abort::AbortStore, memoize::MemoizeCache};
+use crate::{abort::AbortStore, island::Islands, memoize::MemoizeCache};
 
 /// The request context.
 ///
@@ -22,6 +22,7 @@ pub struct Cx {
     request_context: ContextMap,
     memoize_cache: MemoizeCache,
     abort_store: AbortStore,
+    islands: Islands,
 }
 
 impl Cx {
@@ -33,6 +34,7 @@ impl Cx {
             request_context,
             memoize_cache: MemoizeCache::new(),
             abort_store: AbortStore::new(),
+            islands: Islands::default(),
         }
     }
 
@@ -40,6 +42,13 @@ impl Cx {
     #[inline]
     pub fn id(&self) -> CxId {
         self.id
+    }
+
+    /// Returns this request's island state, which allocates an island instance
+    /// per island rendered and numbers the hydration keys inside it.
+    #[inline]
+    pub fn islands(&self) -> &Islands {
+        &self.islands
     }
 }
 

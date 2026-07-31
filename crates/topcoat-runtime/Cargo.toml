@@ -28,6 +28,10 @@ serde.workspace = true
 serde_json.workspace = true
 uuid = { workspace = true, features = ["v4", "serde"] }
 
+[dev-dependencies]
+http.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
 # On wasm32-unknown-unknown the runtime's random IDs need the JS host
 # (`crypto.getRandomValues`) as their source of randomness.
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]

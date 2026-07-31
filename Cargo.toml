@@ -8,6 +8,7 @@ members = [
     "crates/topcoat-cookie",
     "crates/topcoat-core",
     "crates/topcoat-datastar",
+    "crates/topcoat-dom",
     "crates/topcoat-core/grammar",
     "crates/topcoat-core/macro",
     "crates/topcoat-font",
@@ -80,6 +81,11 @@ rust-version = "1.95"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
+# A construct that is compiled twice, like a procedure on the serde wire, expands
+# to one half per target and selects between them with this cfg. A crate that is
+# compiled for the client is built with it; every other crate is built without it,
+# and has to say it knows the name.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(topcoat_client)'] }
 
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "deny" 
@@ -117,6 +123,7 @@ topcoat-core = { version = "0.5.0", path = "crates/topcoat-core" }
 topcoat-core-grammar = { version = "0.5.0", path = "crates/topcoat-core/grammar" }
 topcoat-core-macro = { version = "0.5.0", path = "crates/topcoat-core/macro" }
 topcoat-datastar = { version = "0.5.0", path = "crates/topcoat-datastar" }
+topcoat-dom = { version = "0.5.0", path = "crates/topcoat-dom" }
 topcoat-font = { version = "0.5.0", path = "crates/topcoat-font" }
 topcoat-font-grammar = { version = "0.5.0", path = "crates/topcoat-font/grammar" }
 topcoat-font-macro = { version = "0.5.0", path = "crates/topcoat-font/macro" }
@@ -140,6 +147,11 @@ topcoat-ui-registry = { version = "0.5.0", path = "crates/topcoat-ui/registry" }
 topcoat-view = { version = "0.5.0", path = "crates/topcoat-view" }
 topcoat-view-grammar = { version = "0.5.0", path = "crates/topcoat-view/grammar" }
 topcoat-view-macro = { version = "0.5.0", path = "crates/topcoat-view/macro" }
+
+# The build driver for client crates compiled to JavaScript, which lives in the
+# `rustc_codegen_js` spike. It carries NO version because it is not published:
+# only the CLI's off-by-default `client` feature reaches for it.
+jsc-build = { path = "spike/rustc-codegen-js/jsc-build" }
 
 anyhow = "1.0"
 anymap3 = "1.0"

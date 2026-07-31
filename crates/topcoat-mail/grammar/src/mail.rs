@@ -176,7 +176,12 @@ mod tests {
     fn html_field_expands_the_view_body() {
         let tokens = expand(r#"html: { <p>"Hi"</p> }"#);
         assert!(tokens.contains(". html ("), "{tokens}");
-        assert!(tokens.contains("<p>Hi</p>"), "{tokens}");
+        // The markup, in the two pieces a hydration key site splits an opening
+        // tag into when `topcoat-view-grammar/dom` is on. With that feature off
+        // the tag is one run, which contains both pieces just the same, so this
+        // holds either way.
+        assert!(tokens.contains("<p"), "{tokens}");
+        assert!(tokens.contains(">Hi</p>"), "{tokens}");
     }
 
     #[test]

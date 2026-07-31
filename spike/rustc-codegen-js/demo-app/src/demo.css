@@ -1,0 +1,701 @@
+:root {
+  --bg: #ffffff;
+  --fg: #1b1b1f;
+  --muted: #5c5c68;
+  --line: #d9d9e0;
+  --card: #fafafc;
+  --code: #f1f1f5;
+  --cell: #e6e6ec;
+  --live: #2563eb;
+  --ok-bg: #e8f6ec;
+  --ok-fg: #14532d;
+  --bad-bg: #fdeaea;
+  --bad-fg: #7f1d1d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+  max-width: 900px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+h1 {
+  font-size: 1.8rem;
+  margin: 0 0 0.5rem;
+}
+
+h2 {
+  font-size: 1.2rem;
+  margin: 0 0 0.5rem;
+}
+
+h3 {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+p {
+  margin: 0 0 0.75rem;
+}
+
+a {
+  color: var(--live);
+}
+
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+}
+
+code {
+  background: var(--code);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+}
+
+pre {
+  background: var(--code);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin: 0 0 0.5rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  min-height: 3.5rem;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+}
+
+.intro {
+  margin-bottom: 1.5rem;
+}
+
+.lead,
+.caption,
+.note,
+.readout {
+  color: var(--muted);
+}
+
+.explainer {
+  margin-bottom: 2rem;
+}
+
+.explainer .toggle {
+  margin-bottom: 0.5rem;
+}
+
+.tour {
+  border-left: 3px solid var(--live);
+  padding-left: 1rem;
+  margin-top: 1rem;
+}
+
+.tour ul {
+  margin: 0 0 0.75rem;
+  padding-left: 1.1rem;
+}
+
+.tour li {
+  margin-bottom: 0.4rem;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(40, 1fr);
+  gap: 1px;
+  aspect-ratio: 40 / 25;
+  margin: 1rem 0;
+  cursor: crosshair;
+}
+
+.cell {
+  background: var(--cell);
+  border-radius: 1px;
+}
+
+.cell:hover {
+  outline: 1px solid var(--live);
+}
+
+.cell.on {
+  background: var(--live);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+button,
+select,
+input {
+  font: inherit;
+  font-size: 0.9rem;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0.3rem 0.6rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--live);
+}
+
+.fmt-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin: 1rem 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.field.off {
+  opacity: 0.4;
+}
+
+.field .check {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.readout {
+  font-size: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+#panic-result {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin: 1rem 0;
+  min-height: 3.5rem;
+}
+
+#panic-result.ok {
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+}
+
+#panic-result.panicked {
+  background: var(--bad-bg);
+  color: var(--bad-fg);
+}
+
+#panic-message {
+  font-weight: 600;
+}
+
+#panic-location {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.recipe {
+  padding-left: 1.3rem;
+  color: var(--muted);
+}
+
+.recipe li {
+  margin-bottom: 0.4rem;
+}
+
+/* An island's wrapper is a custom element, which has no display of its own. */
+topcoat-island {
+  display: block;
+}
+
+.island {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.island-count {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+.island-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.island-step {
+  min-width: 3rem;
+}
+
+.island-step:disabled {
+  cursor: not-allowed;
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+/* The nesting island's components: a card with a badge in it. */
+.card {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+}
+
+.card h2 {
+  font-size: 1rem;
+  margin: 0 0 0.4rem;
+}
+
+.badge {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* The searching island: a box and the list its answers land in. */
+.search-input {
+  width: 100%;
+  max-width: 24rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+
+.search-results {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  /* An empty list still takes a line, so an answer arriving does not move the
+     page under the reader. */
+  min-height: 1.6rem;
+}
+
+.search-result {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+/* The streaming island: a chart and the list that re-ranks itself under it. */
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.dash-chart {
+  width: 100%;
+  max-width: 30rem;
+  height: 10rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--card);
+}
+
+.movers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 30rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.mover {
+  display: grid;
+  grid-template-columns: 5rem 1fr 5rem;
+  gap: 0.6rem;
+  align-items: baseline;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  /* A row keeps its node when the list re-ranks, so the move it makes is the
+     one worth watching. */
+  transition: border-color 0.2s ease;
+}
+
+.mover-symbol {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.mover-price,
+.mover-delta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9rem;
+}
+
+.mover-price {
+  text-align: right;
+  color: var(--muted);
+}
+
+.mover-delta {
+  text-align: right;
+}
+
+.mover.up {
+  border-color: var(--ok-fg);
+}
+
+.mover.up .mover-delta {
+  color: var(--ok-fg);
+}
+
+.mover.down {
+  border-color: var(--bad-fg);
+}
+
+.mover.down .mover-delta {
+  color: var(--bad-fg);
+}
+
+/* --- the showcase page -----------------------------------------------------
+   What the page itself needs, as opposed to what its islands do. The three
+   sections below dress one island each and belong to it; everything here is
+   page furniture, so a demo can be removed without leaving a rule behind.
+
+   The dark palette at the end of the file stays last, so anything added here
+   goes ABOVE it and never below. */
+
+/* The source viewer: a collapsed `<details>` with the Rust and the JavaScript
+   compiled from it, side by side where there is room and stacked where there is
+   not. It is the one thing on the page with no client code at all. */
+.viewer > summary {
+  cursor: pointer;
+  color: var(--muted);
+  margin-bottom: 0.75rem;
+}
+
+.viewer-panes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1rem;
+}
+
+.viewer-pane h3 {
+  margin: 0 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Source, not prose: the page's `pre` wraps its lines, which is right for a
+   panic message and wrong for a file. A pane scrolls in both directions instead,
+   and is capped so that a thousand line island does not become the page. */
+.viewer-pane pre {
+  margin: 0;
+  max-height: 26rem;
+  overflow: auto;
+  white-space: pre;
+  tab-size: 4;
+  line-height: 1.45;
+  font-size: 0.75rem;
+}
+
+/* --- life ------------------------------------------------------------------
+   A board and its controls, stacked. The cells themselves are already dressed:
+   `.cell` and `.cell.on` above are the hand wired panel's, and the island uses
+   the same two classes because it is the same thing on the screen. What is here
+   is the grid they sit in, and the reset a cell needs for being a `<button>`
+   rather than a `<div>` -- which it is so that a delegated click can read the
+   cell's number off it. */
+.island.life {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.life-readout {
+  margin: 0;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.life-generation,
+.life-population {
+  color: var(--fg);
+}
+
+.life-grid {
+  display: grid;
+  grid-template-columns: repeat(32, 1fr);
+  gap: 1px;
+  width: 100%;
+  aspect-ratio: 32 / 20;
+  margin: 0;
+  cursor: crosshair;
+}
+
+/* A cell is a button, so everything a button brings has to go: the border and
+   the padding would leave the grid gapped unevenly, and the system appearance
+   would paint over `.cell.on`. */
+.life-grid .cell {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  cursor: inherit;
+}
+
+.life-speed {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* --- sand ------------------------------------------------------------------
+   A drawing surface, so this section is mostly about not fighting the browser
+   over the pointer. The island stacks -- canvas, readout, brush picker --
+   rather than sitting on one baseline like the counter, so it overrides
+   `.island`. */
+.island.sand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.sand-canvas {
+  /* 360 by 240 in the markup, which is 60 by 40 cells of 6 pixels. The element
+     is left at its own size: scaling it would put a resample between what the
+     compiled Rust asked for and what is on screen, and the point of the toy is
+     that those are the same thing. */
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  /* A cell is one `fillRect` and never a fraction of one, so there is nothing
+     for the browser to smooth. */
+  image-rendering: pixelated;
+  /* Without this a drag on a touch screen scrolls the page instead of drawing:
+     the browser claims the gesture before `pointermove` is ever delivered. */
+  touch-action: none;
+  cursor: crosshair;
+  /* The same colour the island paints an emptied cell, so an untouched cell and
+     one that was emptied look alike. `COLOURS[0]` in island/sand.rs, and the
+     one place either of them is written down twice. */
+  background: #1d1d22;
+}
+
+.sand-count {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  margin: 0;
+}
+
+.sand-grains,
+.sand-brush {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* --- mines -----------------------------------------------------------------
+   A 12 by 10 minefield. The island stacks -- status, grid, restart -- rather
+   than sitting on one baseline like the counter, so it overrides `.island`.
+
+   A cell is a real `<button>` carrying its index as its `value`, because that
+   is what lets ONE handler on the grid serve every cell (see island/mines.rs).
+   So every rule here has to undo the page's button styling rather than dress a
+   plain box. */
+.island.mines {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.mines-status {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.mines-left::after {
+  content: " left";
+  color: var(--muted);
+}
+
+.mines-state {
+  display: contents;
+}
+
+.mines-word {
+  color: var(--muted);
+}
+
+.mines-state.won .mines-word {
+  color: var(--ok-fg);
+}
+
+.mines-state.lost .mines-word {
+  color: var(--bad-fg);
+}
+
+.mines-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 2px;
+  width: 100%;
+  max-width: 27rem;
+  aspect-ratio: 12 / 10;
+
+  /* The digits, which are the only colours in the game that mean something.
+     Declared here rather than on `:root` so the whole palette moves together
+     with the grid it belongs to. */
+  --n1: #2563eb;
+  --n2: #15803d;
+  --n3: #b91c1c;
+  --n4: #6d28d9;
+  --n5: #b45309;
+  --n6: #0e7490;
+  --n7: #7f1d1d;
+  --n8: #5c5c68;
+}
+
+.mines-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--cell);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  /* A right click flags rather than selects, and a fast double click on a
+     revealed cell should not highlight the digit under it. */
+  user-select: none;
+}
+
+.mines-cell:hover {
+  outline: 1px solid var(--live);
+}
+
+.mines-cell.open {
+  background: var(--card);
+  cursor: default;
+}
+
+.mines-cell.open:hover {
+  outline: none;
+}
+
+.mines-cell.flagged {
+  color: var(--bad-fg);
+  background: var(--bad-bg);
+}
+
+.mines-cell.blown {
+  color: var(--bad-fg);
+  background: var(--bad-bg);
+  border-color: var(--bad-fg);
+}
+
+.mines-cell.n1 { color: var(--n1); }
+.mines-cell.n2 { color: var(--n2); }
+.mines-cell.n3 { color: var(--n3); }
+.mines-cell.n4 { color: var(--n4); }
+.mines-cell.n5 { color: var(--n5); }
+.mines-cell.n6 { color: var(--n6); }
+.mines-cell.n7 { color: var(--n7); }
+.mines-cell.n8 { color: var(--n8); }
+
+/* The digits again, light enough to read on the dark card. Kept in this section
+   rather than in the palette block at the end of the file, so the whole of the
+   minefield is one thing to read and to remove. */
+@media (prefers-color-scheme: dark) {
+  .mines-grid {
+    --n1: #7dabff;
+    --n2: #6ee7a8;
+    --n3: #fca5a5;
+    --n4: #c4b5fd;
+    --n5: #fcd34d;
+    --n6: #67e8f9;
+    --n7: #f5a9a9;
+    --n8: #a0a0ad;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16161a;
+    --fg: #e6e6ea;
+    --muted: #a0a0ad;
+    --line: #33333d;
+    --card: #1d1d22;
+    --code: #26262d;
+    --cell: #2b2b33;
+    --live: #60a5fa;
+    --ok-bg: #14301f;
+    --ok-fg: #a7e8bd;
+    --bad-bg: #331818;
+    --bad-fg: #f5a9a9;
+  }
+}

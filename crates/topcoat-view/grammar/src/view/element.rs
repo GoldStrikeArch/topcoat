@@ -1,5 +1,3 @@
-use std::sync::atomic::Ordering;
-
 use proc_macro2::Span;
 use quote::quote;
 use syn::{
@@ -79,12 +77,11 @@ impl WriteView for Element {
             } => {
                 // For expression attribute names, we only want to evaluate the expression once and
                 // then store it in a variable.
-                static AUTO_INCREMENT: std::sync::atomic::AtomicU32 =
-                    std::sync::atomic::AtomicU32::new(0);
                 let name_expr = opening_tag.name.expr();
-                let increment = AUTO_INCREMENT.fetch_add(1, Ordering::Relaxed);
-                let name_ident = name_expr
-                    .map(|_| Ident::new(&format!("__element_name_{increment}"), Span::call_site()));
+                let name_ident = name_expr.map(|_| {
+                    let increment = writer.next_auto_increment();
+                    Ident::new(&format!("__element_name_{increment}"), Span::call_site())
+                });
 
                 writer.write_str_unescaped("<");
                 match (name_ident.as_ref(), name_expr) {
@@ -95,12 +92,12 @@ impl WriteView for Element {
                     }
                     _ => opening_tag.name.write(writer),
                 }
+                writer.write_element_key(name_expr.is_some());
+                writer.take_attribute_keys(&opening_tag.attributes);
                 opening_tag.attributes.write(writer);
                 writer.write_str_unescaped(">");
 
-                for child in children {
-                    child.write(writer);
-                }
+                writer.write_element_children(children);
 
                 writer.write_str_unescaped("</");
                 match name_ident {
@@ -112,12 +109,16 @@ impl WriteView for Element {
             Self::SelfClosing { tag } => {
                 writer.write_str_unescaped("<");
                 tag.name.write(writer);
+                writer.write_element_key(tag.name.expr().is_some());
+                writer.take_attribute_keys(&tag.attributes);
                 tag.attributes.write(writer);
                 writer.write_str_unescaped("/>");
             }
             Self::Void { tag } => {
                 writer.write_str_unescaped("<");
                 tag.name.write(writer);
+                writer.write_element_key(tag.name.expr().is_some());
+                writer.take_attribute_keys(&tag.attributes);
                 tag.attributes.write(writer);
                 writer.write_str_unescaped(">");
             }
@@ -266,6 +267,37 @@ mod tests {
     fn parses_nested_children() {
         let element = parse(r#"<div><p>"hi"</p></div>"#);
         assert_eq!(element.children().len(), 1);
+    }
+
+    fn rendered(source: &str) -> String {
+        let mut writer = ViewWriter::new();
+        parse(source).write(&mut writer);
+        writer.into_token_stream().to_string()
+    }
+
+    #[test]
+    fn expression_name_is_bound_once_and_reused_by_the_closing_tag() {
+        let out = rendered("<(tag)>\"hi\"</(tag)>");
+        assert!(out.contains("let __element_name_0 = & tag"), "{out}");
+        assert_eq!(
+            out.matches("__element_name (__cx , & mut __parts").count(),
+            2
+        );
+    }
+
+    #[test]
+    fn expression_names_are_numbered_per_expansion() {
+        // Counting is writer-local, so the same source always expands to the
+        // same identifiers no matter how many views were expanded before it.
+        let first = rendered("<(tag)><(inner)></(inner)></(tag)>");
+        assert!(first.contains("__element_name_0"), "{first}");
+        assert!(first.contains("__element_name_1"), "{first}");
+        assert_eq!(first, rendered("<(tag)><(inner)></(inner)></(tag)>"));
+    }
+
+    #[test]
+    fn static_names_consume_no_identifier() {
+        assert!(!rendered("<div><span></span></div>").contains("__element_name"));
     }
 
     #[test]

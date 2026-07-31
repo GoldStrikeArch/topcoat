@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use http::{HeaderMap, StatusCode};
 use smallvec::SmallVec;
 use topcoat_core::context::Cx;
+use topcoat_core::island::IslandInstance;
 
 use crate::{Formatter, HtmlContext, HtmlWriter};
 
@@ -93,12 +94,133 @@ impl View {
         }
     }
 
+    /// Returns the view rendered as the island instance `instance`.
+    ///
+    /// Everything inside an island writes the hydration keys and markers that
+    /// let the client find the nodes it has to take over, each key scoped to
+    /// `instance`. Allocate the instance from the request with
+    /// [`Cx::islands`](topcoat_core::context::Cx::islands) so that every island
+    /// on a page gets its own key space.
+    #[must_use]
+    pub fn island(self, instance: IslandInstance) -> Self {
+        Self {
+            part: ViewPart::Island {
+                size_hint: self.part.size_hint(),
+                inner: Box::new(self.part),
+                instance,
+            },
+        }
+    }
+
+    /// Returns the view rendered as a component's own view.
+    ///
+    /// A component's view numbers its hydration keys from zero, the way the
+    /// island's own view does, so on its own a component rendered twice would
+    /// write the same keys twice. Wrapping it here scopes them: the call takes
+    /// the next ordinal the caller had reached and every key inside the
+    /// component is written under it.
+    ///
+    /// Wrap the view of a component the client renders for itself, so the keys
+    /// the server writes are the keys the client asks for. A component only the
+    /// server renders needs no wrapper, and outside an island this changes
+    /// nothing: no key is written there either way.
+    #[must_use]
+    pub fn component(self) -> Self {
+        Self {
+            part: ViewPart::Component {
+                size_hint: self.part.size_hint(),
+                inner: Box::new(self.part),
+                child_content: None,
+            },
+        }
+    }
+
+    /// Returns the view rendered as a component's own view, called with `child`
+    /// as its child content.
+    ///
+    /// Child content is an argument, so it is built where the component is
+    /// called: it is rendered before the call takes its ordinal, numbering its
+    /// keys in the caller's own numbering, and the bytes it wrote are spliced in
+    /// wherever the component's view renders [`View::child_content`]. The keys a
+    /// render then writes are no longer in document order, which is the point:
+    /// the client builds child content as an argument too, so both sides number
+    /// it before the component and neither numbers it inside.
+    ///
+    /// Child content the component's view never renders is numbered all the
+    /// same, because building the argument is what spends the ordinals, on both
+    /// sides.
+    #[must_use]
+    pub fn component_with_child(self, child: Self) -> Self {
+        Self {
+            part: ViewPart::Component {
+                size_hint: self.part.size_hint() + child.part.size_hint(),
+                inner: Box::new(self.part),
+                child_content: Some(Box::new(child.part)),
+            },
+        }
+    }
+
+    /// Returns the view that renders the child content a component was called
+    /// with.
+    ///
+    /// A component's view renders this where its child content belongs, and the
+    /// call site hands the content over with
+    /// [`component_with_child`](Self::component_with_child). Rendered anywhere
+    /// else, it renders nothing.
+    #[must_use]
+    pub fn child_content() -> Self {
+        Self {
+            part: ViewPart::ChildContent,
+        }
+    }
+
+    /// Returns the view rendered as `instance` and wrapped in the element a
+    /// client finds an island by.
+    ///
+    /// The wrapper is the whole interface between a rendered island and the
+    /// code that takes it over. It carries the island's `name`, the instance
+    /// whose key prefix scopes the hydration keys inside it, and `seeds`, an
+    /// already-serialized payload the client is started from. The wrapper
+    /// itself is outside the island, so it carries no hydration key of its own
+    /// and a client can use it as the element it hydrates into.
+    ///
+    /// The tag is a custom element name so that a runtime walking the document
+    /// can recognize an island subtree and leave it to whoever owns it.
+    #[must_use]
+    pub fn island_element(
+        self,
+        name: impl Into<Cow<'static, str>>,
+        instance: IslandInstance,
+        seeds: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        let mut parts = ViewParts::new();
+        let mut w = PartsWriter::new(&mut parts, HtmlContext::AttributeValue);
+        w.push_str_unescaped("<topcoat-island data-ti=\"");
+        w.push_str(name);
+        w.push_str_unescaped("\" data-tk=\"");
+        w.push_str(instance.to_string());
+        w.push_str_unescaped("\" data-ts=\"");
+        w.push_str(seeds);
+        w.push_str_unescaped("\">");
+        parts.push_view(self.island(instance));
+        PartsWriter::new(&mut parts, HtmlContext::AttributeValue)
+            .push_str_unescaped("</topcoat-island>");
+        Self::new(parts)
+    }
+
     /// Unwraps the view into its root part.
     #[inline]
     pub(crate) fn into_part(self) -> ViewPart {
         self.part
     }
 }
+
+/// The custom element name an island's rendered subtree is wrapped in.
+///
+/// A client runtime that is not the one hydrating an island recognizes the
+/// subtree by this tag and skips it, so the two never both drive the same
+/// nodes.
+pub const ISLAND_TAG: &str = "topcoat-island";
 
 /// The output of rendering a [`View`] for an HTTP response.
 ///
@@ -197,6 +319,28 @@ pub enum ViewPart {
         inner: Box<[ViewPart]>,
         size_hint: usize,
     },
+    /// A hydration site, which renders only inside an island.
+    #[non_exhaustive]
+    HydrationKey { site: HydrationSite },
+    /// A subtree rendered as one island instance.
+    #[non_exhaustive]
+    Island {
+        instance: IslandInstance,
+        inner: Box<ViewPart>,
+        size_hint: usize,
+    },
+    /// A subtree rendered as a component's own view, whose hydration keys nest
+    /// under the ordinal the call took, and the child content the call passed it.
+    #[non_exhaustive]
+    Component {
+        inner: Box<ViewPart>,
+        child_content: Option<Box<ViewPart>>,
+        size_hint: usize,
+    },
+    /// The child content a component was called with, rendered where its view
+    /// puts it.
+    #[non_exhaustive]
+    ChildContent,
     /// A response status code recorded at render time; renders no content.
     #[cfg(feature = "http")]
     #[non_exhaustive]
@@ -265,6 +409,34 @@ impl ViewPart {
                     part.render(cx, f);
                 }
             }
+            Self::HydrationKey { site } => {
+                if let Some(instance) = f.island() {
+                    site.render(instance, f);
+                }
+            }
+            Self::Island {
+                instance, inner, ..
+            } => {
+                let previous = f.enter_island(*instance);
+                inner.render(cx, f);
+                f.restore(previous);
+            }
+            Self::Component {
+                inner,
+                child_content,
+                ..
+            } => {
+                // Child content is an argument, so it is rendered here, where
+                // the component is called and before the call takes its
+                // ordinal. Only its bytes wait for the view to render them.
+                let child_content = child_content
+                    .as_ref()
+                    .map(|content| f.write_aside(|f| content.render(cx, f)));
+                let previous = f.enter_component(child_content);
+                inner.render(cx, f);
+                f.restore(previous);
+            }
+            Self::ChildContent => f.write_child_content(),
             #[cfg(feature = "http")]
             Self::StatusCode(status_code) => f.record_status_code(*status_code),
             #[cfg(feature = "http")]
@@ -309,9 +481,69 @@ impl ViewPart {
                 // Assume some characters escape into multi-byte sequences.
                 _ => value.len() + value.len() / 8,
             },
-            Self::BoxDyn { size_hint, .. } | Self::BoxSlice { size_hint, .. } => *size_hint,
+            Self::BoxDyn { size_hint, .. }
+            | Self::BoxSlice { size_hint, .. }
+            | Self::Island { size_hint, .. }
+            | Self::Component { size_hint, .. } => *size_hint,
+            Self::HydrationKey { site, .. } => site.size_hint(),
+            // The content is sized where the call site passed it in.
+            Self::ChildContent => 0,
             #[cfg(feature = "http")]
             Self::StatusCode(_) | Self::Headers(_) => 0,
+        }
+    }
+}
+
+/// A position in a view that hydration has to be able to find again.
+///
+/// A site renders only while the render is inside an island, so a view that is
+/// never rendered as one produces markup with no trace of hydration in it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum HydrationSite {
+    /// The outermost element of a template, which is the only element the
+    /// client looks up by key: everything below it is reached by walking down
+    /// from it. Renders as a `data-hk` attribute and so belongs inside the
+    /// element's opening tag, after the tag name.
+    TemplateRoot,
+    /// The start of a child region whose content is replaced at runtime.
+    ChildStart,
+    /// The end of a child region whose content is replaced at runtime.
+    ChildEnd,
+}
+
+impl HydrationSite {
+    /// Writes this site inside `instance`.
+    ///
+    /// A template root takes the next ordinal the island has to hand, so keys
+    /// are numbered in the order they are written, and writes it in the
+    /// component nesting the render is inside.
+    fn render(self, instance: IslandInstance, f: &mut Formatter<'_>) {
+        match self {
+            // A key is decimal digits and lowercase letters, so nothing here
+            // needs escaping for the attribute value it is written into.
+            Self::TemplateRoot => {
+                f.write_str(" data-hk=\"");
+                f.write_next_key(instance);
+                f.write_str("\"");
+            }
+            // The long comment form, which is what a browser parsing a served
+            // document expects. The short `<!$>` form is only valid inside a
+            // template string handed to `innerHTML`. A marker is found by
+            // walking out from the node before it rather than by key, so it
+            // takes no ordinal on either side.
+            Self::ChildStart => f.write_str("<!--$-->"),
+            Self::ChildEnd => f.write_str("<!--/-->"),
+        }
+    }
+
+    /// An estimate of the number of bytes this site writes inside an island.
+    fn size_hint(self) -> usize {
+        match self {
+            // ` data-hk="i0.a10"`, so a second digit in each half plus the
+            // letter a second digit brings with it.
+            Self::TemplateRoot => 18,
+            Self::ChildStart | Self::ChildEnd => 8,
         }
     }
 }
@@ -383,6 +615,20 @@ impl ViewParts {
     #[inline]
     pub fn push_part(&mut self, part: ViewPart) -> &mut Self {
         self.items.push(part);
+        self
+    }
+
+    /// Appends a hydration site.
+    ///
+    /// The site renders nothing unless the view is rendered as an island, so
+    /// generated code can push one wherever the key plan has a site without
+    /// changing the markup of a view that is never hydrated. A site that carries
+    /// a key is numbered when it renders, not here: only a render knows which
+    /// branches it took.
+    #[doc(hidden)]
+    #[inline]
+    pub fn push_hydration_site(&mut self, site: HydrationSite) -> &mut Self {
+        self.items.push(ViewPart::HydrationKey { site });
         self
     }
 }
@@ -646,6 +892,488 @@ mod tests {
     fn size_hint_is_exact_for_unescaped_strings() {
         let view = View::unescaped_unchecked("<b>raw</b>");
         assert_eq!(view.part.size_hint(), 10);
+    }
+
+    mod hydration {
+        use topcoat_core::island::Islands;
+
+        use super::*;
+
+        /// A view of one element with a key on it and a marked dynamic child,
+        /// the shape the `view!` macro produces for `<p>(value)</p>`.
+        fn keyed_view() -> View {
+            let mut parts = ViewParts::new();
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str("<p");
+            parts.push_hydration_site(HydrationSite::TemplateRoot);
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str(">");
+            parts.push_hydration_site(HydrationSite::ChildStart);
+            PartsWriter::new(&mut parts, HtmlContext::Text).push_str("value");
+            parts.push_hydration_site(HydrationSite::ChildEnd);
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str("</p>");
+            View::new(parts)
+        }
+
+        #[test]
+        fn the_wrapper_carries_what_a_client_needs_to_take_over() {
+            let cx = Cx::default();
+            let instance = cx.islands().next_instance();
+            assert_eq!(
+                keyed_view()
+                    .island_element("counter", instance, "[5.0]")
+                    .render(&cx),
+                concat!(
+                    r#"<topcoat-island data-ti="counter" data-tk="i0" data-ts="[5.0]">"#,
+                    r#"<p data-hk="i0.0"><!--$-->value<!--/--></p>"#,
+                    "</topcoat-island>",
+                ),
+            );
+        }
+
+        #[test]
+        fn the_wrapper_is_the_tag_a_foreign_runtime_skips() {
+            let cx = Cx::default();
+            let html = View::empty()
+                .island_element("x", cx.islands().next_instance(), "[]")
+                .render(&cx);
+            assert!(html.starts_with(&format!("<{ISLAND_TAG} ")), "{html}");
+            assert!(html.ends_with(&format!("</{ISLAND_TAG}>")), "{html}");
+        }
+
+        #[test]
+        fn a_seed_payload_cannot_end_its_attribute() {
+            let cx = Cx::default();
+            let html = View::empty()
+                .island_element("x", cx.islands().next_instance(), r#"["a\"b"]"#)
+                .render(&cx);
+            assert!(
+                html.contains(r#"data-ts="[&quot;a\&quot;b&quot;]""#),
+                "{html}"
+            );
+        }
+
+        #[test]
+        fn hydration_sites_render_nothing_outside_an_island() {
+            assert_eq!(keyed_view().render(&Cx::default()), "<p>value</p>");
+        }
+
+        #[test]
+        fn an_island_renders_keys_and_markers() {
+            let cx = Cx::default();
+            let instance = cx.islands().next_instance();
+            assert_eq!(
+                keyed_view().island(instance).render(&cx),
+                "<p data-hk=\"i0.0\"><!--$-->value<!--/--></p>",
+            );
+        }
+
+        #[test]
+        fn each_island_keys_against_its_own_instance() {
+            let cx = Cx::default();
+            let mut parts = ViewParts::new();
+            parts.push_view(keyed_view().island(cx.islands().next_instance()));
+            parts.push_view(keyed_view().island(cx.islands().next_instance()));
+
+            let html = View::new(parts).render(&cx);
+            assert!(html.contains("data-hk=\"i0.0\""), "{html}");
+            assert!(html.contains("data-hk=\"i1.0\""), "{html}");
+        }
+
+        #[test]
+        fn an_island_restores_the_surrounding_scope() {
+            // Content after an island is outside it again, so it must go back
+            // to writing no hydration sites at all.
+            let cx = Cx::default();
+            let mut parts = ViewParts::new();
+            parts.push_view(keyed_view().island(cx.islands().next_instance()));
+            parts.push_view(keyed_view());
+
+            assert_eq!(
+                View::new(parts).render(&cx),
+                "<p data-hk=\"i0.0\"><!--$-->value<!--/--></p><p>value</p>",
+            );
+        }
+
+        #[test]
+        fn a_nested_island_keys_against_the_inner_instance() {
+            let cx = Cx::default();
+            let outer = cx.islands().next_instance();
+            let inner = cx.islands().next_instance();
+
+            let mut parts = ViewParts::new();
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str("<div");
+            parts.push_hydration_site(HydrationSite::TemplateRoot);
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str(">");
+            parts.push_view(keyed_view().island(inner));
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str("</div>");
+            // The outer island carries on numbering where it left off: the inner
+            // island's keys were never its to count.
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str("<hr");
+            parts.push_hydration_site(HydrationSite::TemplateRoot);
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str(">");
+
+            assert_eq!(
+                View::new(parts).island(outer).render(&cx),
+                concat!(
+                    "<div data-hk=\"i0.0\">",
+                    "<p data-hk=\"i1.0\"><!--$-->value<!--/--></p>",
+                    "</div><hr data-hk=\"i0.1\">",
+                ),
+            );
+        }
+
+        #[test]
+        fn a_component_nests_its_keys_under_the_ordinal_the_call_took() {
+            let cx = Cx::default();
+            let instance = cx.islands().next_instance();
+
+            let mut parts = ViewParts::new();
+            // The island's own view claims ordinal 0, then calls a component,
+            // which takes ordinal 1 and starts its own numbering from zero.
+            parts.push_view(keyed_view());
+            parts.push_view(keyed_view().component());
+            // Back in the island's view, numbering carries on past the call.
+            parts.push_view(keyed_view());
+
+            assert_eq!(
+                View::new(parts).island(instance).render(&cx),
+                concat!(
+                    "<p data-hk=\"i0.0\"><!--$-->value<!--/--></p>",
+                    "<p data-hk=\"i0.10\"><!--$-->value<!--/--></p>",
+                    "<p data-hk=\"i0.2\"><!--$-->value<!--/--></p>",
+                ),
+            );
+        }
+
+        #[test]
+        fn a_component_inside_a_component_nests_again() {
+            let cx = Cx::default();
+            let instance = cx.islands().next_instance();
+
+            let mut parts = ViewParts::new();
+            parts.push_view(keyed_view());
+            parts.push_view(keyed_view().component());
+            let inner = View::new({
+                let mut inner = ViewParts::new();
+                inner.push_view(keyed_view());
+                inner.push_view(keyed_view().component());
+                inner
+            });
+            parts.push_view(inner.component());
+
+            assert_eq!(
+                View::new(parts).island(instance).render(&cx),
+                concat!(
+                    "<p data-hk=\"i0.0\"><!--$-->value<!--/--></p>",
+                    "<p data-hk=\"i0.10\"><!--$-->value<!--/--></p>",
+                    "<p data-hk=\"i0.20\"><!--$-->value<!--/--></p>",
+                    "<p data-hk=\"i0.210\"><!--$-->value<!--/--></p>",
+                ),
+            );
+        }
+
+        #[test]
+        fn the_same_component_rendered_twice_writes_different_keys() {
+            // The point of nesting: a component numbers its own keys from zero,
+            // so without a context two calls would claim the same nodes.
+            let cx = Cx::default();
+            let instance = cx.islands().next_instance();
+
+            let mut parts = ViewParts::new();
+            parts.push_view(keyed_view().component());
+            parts.push_view(keyed_view().component());
+
+            assert_eq!(
+                View::new(parts).island(instance).render(&cx),
+                concat!(
+                    "<p data-hk=\"i0.00\"><!--$-->value<!--/--></p>",
+                    "<p data-hk=\"i0.10\"><!--$-->value<!--/--></p>",
+                ),
+            );
+        }
+
+        #[test]
+        fn a_component_outside_an_island_takes_no_ordinal() {
+            // Nothing is numbered outside an island, so wrapping a view as a
+            // component there changes neither the markup nor the numbering of
+            // the island that follows.
+            let cx = Cx::default();
+            let mut parts = ViewParts::new();
+            parts.push_view(keyed_view().component());
+            parts.push_view(keyed_view().island(cx.islands().next_instance()));
+
+            assert_eq!(
+                View::new(parts).render(&cx),
+                concat!(
+                    "<p>value</p>",
+                    "<p data-hk=\"i0.0\"><!--$-->value<!--/--></p>",
+                ),
+            );
+        }
+
+        #[test]
+        fn an_island_inside_a_component_keys_against_itself() {
+            let cx = Cx::default();
+            let outer = cx.islands().next_instance();
+            let inner = cx.islands().next_instance();
+
+            let mut parts = ViewParts::new();
+            parts.push_view(keyed_view());
+            parts.push_view(
+                View::new({
+                    let mut body = ViewParts::new();
+                    body.push_view(keyed_view().island(inner));
+                    body
+                })
+                .component(),
+            );
+            parts.push_view(keyed_view());
+
+            assert_eq!(
+                View::new(parts).island(outer).render(&cx),
+                concat!(
+                    "<p data-hk=\"i0.0\"><!--$-->value<!--/--></p>",
+                    "<p data-hk=\"i1.0\"><!--$-->value<!--/--></p>",
+                    "<p data-hk=\"i0.2\"><!--$-->value<!--/--></p>",
+                ),
+            );
+        }
+
+        #[test]
+        fn a_component_past_ten_calls_keeps_the_segments_separable() {
+            let cx = Cx::default();
+            let instance = cx.islands().next_instance();
+
+            let mut parts = ViewParts::new();
+            for _ in 0..11 {
+                parts.push_hydration_site(HydrationSite::TemplateRoot);
+            }
+            // The eleventh call takes ordinal 11, whose two digits the letter
+            // records, so the key inside it cannot be read as any other.
+            parts.push_view(keyed_view().component());
+
+            let html = View::new(parts).island(instance).render(&cx);
+            assert!(html.contains("data-hk=\"i0.a10\""), "{html}");
+            assert!(html.contains("data-hk=\"i0.a110\""), "{html}");
+        }
+
+        /// The view of a component that renders its child content inside its own
+        /// element, which is the shape `<div>(child)</div>` produces.
+        fn wrapping_view(child: View) -> View {
+            let mut parts = ViewParts::new();
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str("<div");
+            parts.push_hydration_site(HydrationSite::TemplateRoot);
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str(">");
+            parts.push_view(View::child_content());
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str("</div>");
+            View::new(parts).component_with_child(child)
+        }
+
+        /// A view of one element with a key on it and nothing in it, the shape
+        /// the child content of a component call is written as.
+        fn empty_keyed_view() -> View {
+            let mut parts = ViewParts::new();
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str("<span");
+            parts.push_hydration_site(HydrationSite::TemplateRoot);
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str("></span>");
+            View::new(parts)
+        }
+
+        #[test]
+        fn child_content_is_numbered_in_the_callers_numbering() {
+            // The oracle row: eager child content is built as an argument, so it
+            // takes the caller's ordinal 0 and the component's own call takes 1.
+            // The keys the render writes are therefore not in document order.
+            let cx = Cx::default();
+            let instance = cx.islands().next_instance();
+
+            assert_eq!(
+                wrapping_view(empty_keyed_view())
+                    .island(instance)
+                    .render(&cx),
+                "<div data-hk=\"i0.10\"><span data-hk=\"i0.0\"></span></div>",
+            );
+        }
+
+        #[test]
+        fn a_sibling_after_a_call_with_child_content_skips_both_ordinals() {
+            // The second oracle row: the child spent one ordinal and the call
+            // spent one, so the next sibling is numbered 2.
+            let cx = Cx::default();
+            let instance = cx.islands().next_instance();
+
+            let mut parts = ViewParts::new();
+            parts.push_view(wrapping_view(empty_keyed_view()));
+            parts.push_view(empty_keyed_view());
+
+            assert_eq!(
+                View::new(parts).island(instance).render(&cx),
+                concat!(
+                    "<div data-hk=\"i0.10\"><span data-hk=\"i0.0\"></span></div>",
+                    "<span data-hk=\"i0.2\"></span>",
+                ),
+            );
+        }
+
+        #[test]
+        fn child_content_a_view_never_renders_is_numbered_all_the_same() {
+            // Building the argument is what spends the ordinals, and the client
+            // builds it too, so a view that drops its child content must not
+            // shift what follows.
+            let cx = Cx::default();
+            let instance = cx.islands().next_instance();
+
+            let mut parts = ViewParts::new();
+            parts.push_view(empty_keyed_view().component_with_child(empty_keyed_view()));
+            parts.push_view(empty_keyed_view());
+
+            assert_eq!(
+                View::new(parts).island(instance).render(&cx),
+                concat!(
+                    "<span data-hk=\"i0.10\"></span>",
+                    "<span data-hk=\"i0.2\"></span>",
+                ),
+            );
+        }
+
+        #[test]
+        fn child_content_that_calls_a_component_spends_the_callers_ordinals() {
+            // The content is one component call, so it takes the caller's
+            // ordinal 0 and numbers its own view under it, before the call it is
+            // an argument of takes ordinal 1.
+            let cx = Cx::default();
+            let instance = cx.islands().next_instance();
+
+            assert_eq!(
+                wrapping_view(empty_keyed_view().component())
+                    .island(instance)
+                    .render(&cx),
+                "<div data-hk=\"i0.10\"><span data-hk=\"i0.00\"></span></div>",
+            );
+        }
+
+        #[test]
+        fn where_a_view_renders_its_child_content_does_not_change_its_keys() {
+            // The content is numbered where the call is, and only its bytes wait
+            // for the view to place them.
+            let cx = Cx::default();
+            let instance = cx.islands().next_instance();
+
+            let mut inner = ViewParts::new();
+            inner.push_view(View::child_content());
+            inner.push_view(empty_keyed_view());
+            let view = View::new(inner).component_with_child(empty_keyed_view());
+
+            assert_eq!(
+                view.island(instance).render(&cx),
+                concat!(
+                    "<span data-hk=\"i0.0\"></span>",
+                    "<span data-hk=\"i0.10\"></span>",
+                ),
+            );
+        }
+
+        #[test]
+        fn child_content_belongs_to_the_component_it_was_passed_to() {
+            // A component called from inside another one has child content of
+            // its own, and a view that renders content it was never given
+            // renders nothing.
+            let cx = Cx::default();
+            let instance = cx.islands().next_instance();
+
+            let outer = wrapping_view(empty_keyed_view());
+            let mut parts = ViewParts::new();
+            parts.push_view(outer);
+            // A component with no child content at all, whose view still asks
+            // for it.
+            let mut asking = ViewParts::new();
+            asking.push_view(View::child_content());
+            asking.push_view(empty_keyed_view());
+            parts.push_view(View::new(asking).component());
+
+            assert_eq!(
+                View::new(parts).island(instance).render(&cx),
+                concat!(
+                    "<div data-hk=\"i0.10\"><span data-hk=\"i0.0\"></span></div>",
+                    "<span data-hk=\"i0.20\"></span>",
+                ),
+            );
+        }
+
+        #[test]
+        fn child_content_outside_an_island_renders_without_keys() {
+            let cx = Cx::default();
+            assert_eq!(
+                wrapping_view(empty_keyed_view()).render(&cx),
+                "<div><span></span></div>",
+            );
+        }
+
+        #[test]
+        fn child_content_is_rendered_where_the_call_is_even_when_it_is_written_later() {
+            // The aside buffer lifts the content's bytes out of the output, so
+            // what surrounds the call is untouched by having rendered it.
+            let cx = Cx::default();
+            let instance = cx.islands().next_instance();
+
+            let mut parts = ViewParts::new();
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str("<p>");
+            parts.push_view(wrapping_view(empty_keyed_view()));
+            PartsWriter::new(&mut parts, HtmlContext::Unescaped).push_str("</p>");
+
+            assert_eq!(
+                View::new(parts).island(instance).render(&cx),
+                "<p><div data-hk=\"i0.10\"><span data-hk=\"i0.0\"></span></div></p>",
+            );
+        }
+
+        #[test]
+        fn keys_are_numbered_in_the_order_they_render() {
+            let islands = Islands::default();
+            let instance = islands.next_instance();
+            let mut parts = ViewParts::new();
+            for _ in 0..3 {
+                parts.push_hydration_site(HydrationSite::TemplateRoot);
+            }
+
+            assert_eq!(
+                View::new(parts).island(instance).render(&Cx::default()),
+                " data-hk=\"i0.0\" data-hk=\"i0.1\" data-hk=\"i0.2\"",
+            );
+        }
+
+        #[test]
+        fn markers_take_no_key_of_their_own() {
+            // The client finds a marker by walking, not by key, so a marker
+            // between two roots must not shift the numbering.
+            let islands = Islands::default();
+            let instance = islands.next_instance();
+            let mut parts = ViewParts::new();
+            parts.push_hydration_site(HydrationSite::TemplateRoot);
+            parts.push_hydration_site(HydrationSite::ChildStart);
+            parts.push_hydration_site(HydrationSite::ChildEnd);
+            parts.push_hydration_site(HydrationSite::TemplateRoot);
+
+            assert_eq!(
+                View::new(parts).island(instance).render(&Cx::default()),
+                " data-hk=\"i0.0\"<!--$--><!--/--> data-hk=\"i0.1\"",
+            );
+        }
+
+        #[test]
+        fn an_island_past_ten_templates_keeps_writing_the_clients_keys() {
+            let islands = Islands::default();
+            let instance = islands.next_instance();
+            let mut parts = ViewParts::new();
+            for _ in 0..12 {
+                parts.push_hydration_site(HydrationSite::TemplateRoot);
+            }
+
+            // The client's own numbering starts carrying the ordinal's length at
+            // ten, and only the client's spelling is findable.
+            let html = View::new(parts).island(instance).render(&Cx::default());
+            assert!(html.ends_with(" data-hk=\"i0.9\" data-hk=\"i0.a10\" data-hk=\"i0.a11\""));
+            assert_eq!(html.matches("data-hk").count(), 12);
+        }
     }
 
     #[cfg(feature = "http")]

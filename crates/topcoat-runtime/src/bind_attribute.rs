@@ -28,7 +28,12 @@ where
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
         let Expr { evaluated, js } = self.value;
 
+        // The evaluated attribute is what the server rendered either way; only
+        // the source that would re-evaluate it belongs to this runtime.
         Attribute::new(self.key.clone(), evaluated).into_view_parts(cx, parts);
+        if crate::in_island(cx) {
+            return;
+        }
         Attribute::new(
             (Unescaped::new_unchecked("data-topcoat-bind:"), self.key),
             js,

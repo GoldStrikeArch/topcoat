@@ -24,6 +24,12 @@ where
     T: NodeViewParts,
 {
     fn into_view_parts(self, cx: &Cx, parts: &mut PartsWriter<'_>) {
+        // Inside an island the expression is the island's to re-run, so only
+        // the value it evaluated to is written.
+        if crate::in_island(cx) {
+            self.evaluated.into_view_parts(cx, parts);
+            return;
+        }
         parts.push_str_unescaped("<!-- ::topcoat::expr::start(\"");
         parts.push_part(self.js);
         parts.push_str_unescaped("\") -->");

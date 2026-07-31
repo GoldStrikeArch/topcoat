@@ -39,6 +39,7 @@ changelog_include = [
     "topcoat-core-grammar",
     "topcoat-core-macro",
     "topcoat-datastar",
+    "topcoat-dom",
     "topcoat-font",
     "topcoat-font-grammar",
     "topcoat-font-macro",
@@ -101,6 +102,11 @@ version_group = "topcoat"
 
 [[package]]
 name = "topcoat-datastar"
+release = true
+version_group = "topcoat"
+
+[[package]]
+name = "topcoat-dom"
 release = true
 version_group = "topcoat"
 

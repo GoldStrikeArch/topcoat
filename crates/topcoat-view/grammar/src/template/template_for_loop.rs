@@ -1,7 +1,8 @@
 use quote::quote;
 use syn::{
-    Expr, ExprBreak, ExprContinue, Pat, Token,
+    Expr, ExprBreak, ExprContinue, Pat, Token, parenthesized,
     parse::{Parse, ParseStream},
+    token::Paren,
 };
 
 use topcoat_core_grammar::ParseOption;
@@ -12,18 +13,31 @@ use crate::{
     view::{ViewWriter, WriteView},
 };
 
+/// The keywords a `for` loop's clauses are written with.
+mod kw {
+    syn::custom_keyword!(key);
+}
+
 /// A `for pat in expr { ... }` loop in view-body position. The body is
 /// rendered once per iteration.
+///
+/// An optional `key (expr)` clause after the iterable names the value that
+/// identifies a row, which a client emitter uses to match the rows it already
+/// rendered against the rows a re-run produced. A server render walks the
+/// iterable once in order and needs no such matching, so it neither reads nor
+/// evaluates the key.
 pub struct TemplateForLoop<T> {
     pub for_token: Token![for],
     pub pat: Box<Pat>,
     pub in_token: Token![in],
     pub expr: Box<Expr>,
+    pub key: Option<ForLoopKey>,
     pub body: TemplateBlock<T>,
 }
 
 impl<T: WriteView> WriteView for TemplateForLoop<T> {
     fn write(&self, writer: &mut ViewWriter) {
+        writer.take_reactive_scope_key();
         writer.for_loop(&self.pat, &self.expr, |writer| {
             self.body.write(writer);
         });
@@ -45,6 +59,7 @@ impl<T: Parse> Parse for TemplateForLoop<T> {
             pat: Box::new(input.call(Pat::parse_single)?),
             in_token: input.parse()?,
             expr: Box::new(input.call(Expr::parse_without_eager_brace)?),
+            key: ForLoopKey::peek(input).then(|| input.parse()).transpose()?,
             body: input.parse()?,
         })
     }
@@ -70,7 +85,51 @@ impl<T: topcoat_core_grammar::pretty::PrettyPrint> topcoat_core_grammar::pretty:
         " ".pretty_print(printer);
         self.expr.pretty_print(printer);
         " ".pretty_print(printer);
+        if let Some(key) = &self.key {
+            key.pretty_print(printer);
+            " ".pretty_print(printer);
+        }
         self.body.pretty_print(printer);
+    }
+}
+
+/// The `key (expr)` clause of a `for` loop, naming the value that identifies a
+/// row.
+///
+/// A row's key tells a client emitter which rendered row a row of a re-run is,
+/// so a list that gains or loses an entry keeps the nodes of the entries it still
+/// has. Keys have to be unique among the rows of one loop, and stable for as long
+/// as a row means the same thing.
+pub struct ForLoopKey {
+    pub key_token: kw::key,
+    pub paren_token: Paren,
+    pub expr: Box<Expr>,
+}
+
+impl Parse for ForLoopKey {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let content;
+        Ok(Self {
+            key_token: input.parse()?,
+            paren_token: parenthesized!(content in input),
+            expr: Box::new(content.parse()?),
+        })
+    }
+}
+
+impl ParseOption for ForLoopKey {
+    fn peek(input: ParseStream) -> bool {
+        input.peek(kw::key) && input.peek2(Paren)
+    }
+}
+
+#[cfg(feature = "pretty")]
+impl topcoat_core_grammar::pretty::PrettyPrint for ForLoopKey {
+    fn pretty_print(&self, printer: &mut topcoat_core_grammar::pretty::Printer<'_>) {
+        "key".pretty_print(printer);
+        " (".pretty_print(printer);
+        self.expr.pretty_print(printer);
+        ")".pretty_print(printer);
     }
 }
 
@@ -208,6 +267,42 @@ mod tests {
         // being eaten by the expression.
         let loop_ = parse(r"for x in items.iter() { (x) }");
         assert_eq!(loop_.expr.to_token_stream().to_string(), "items . iter ()");
+    }
+
+    #[test]
+    fn a_loop_without_the_clause_has_no_key() {
+        assert!(parse(r"for x in xs { (x) }").key.is_none());
+    }
+
+    #[test]
+    fn parses_key_clause() {
+        let loop_ = parse(r"for item in items key (item.id) { <li>(item)</li> }");
+        let key = loop_.key.expect("the clause is parsed");
+        assert_eq!(key.expr.to_token_stream().to_string(), "item . id");
+        assert_eq!(loop_.expr.to_token_stream().to_string(), "items");
+        assert_eq!(loop_.body.children.len(), 1);
+    }
+
+    #[test]
+    fn a_key_clause_ends_the_iterable_expression() {
+        // The iterable is parsed without an eager brace, so `key` is what stops
+        // it rather than the body's `{`.
+        let loop_ = parse(r"for item in items.iter() key (item.id) {}");
+        assert_eq!(loop_.expr.to_token_stream().to_string(), "items . iter ()");
+        assert!(loop_.key.is_some());
+    }
+
+    #[test]
+    fn a_method_named_key_is_not_the_clause() {
+        let loop_ = parse(r"for x in xs.key(k) { (x) }");
+        assert_eq!(loop_.expr.to_token_stream().to_string(), "xs . key (k)");
+        assert!(loop_.key.is_none());
+    }
+
+    #[test]
+    fn key_without_parentheses_is_not_the_clause() {
+        assert!(!peeks(ForLoopKey::peek, "key { }"));
+        assert!(peeks(ForLoopKey::peek, "key (x)"));
     }
 
     #[test]

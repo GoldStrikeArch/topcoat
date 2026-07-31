@@ -41,6 +41,38 @@ impl Node {
     pub fn is_block(&self) -> bool {
         matches!(self, Self::Block(..))
     }
+
+    /// Returns `true` if the node puts content into the document, and so counts
+    /// towards the number of children its parent has.
+    ///
+    /// A declaration or a jump only affects the code around it, so a parent
+    /// whose other children are all declarations still has a single child.
+    #[must_use]
+    pub fn is_rendered(&self) -> bool {
+        !matches!(
+            self,
+            Self::Local(_) | Self::SignalDecaration(_) | Self::Continue(_) | Self::Break(_)
+        )
+    }
+
+    /// Returns `true` if what the node renders is decided at runtime, so the
+    /// client has to be able to find the range it occupies to replace it.
+    ///
+    /// Literal text, doctypes, and elements are static: the client reaches them
+    /// by walking down from the template they belong to.
+    #[must_use]
+    pub fn is_dynamic(&self) -> bool {
+        !matches!(
+            self,
+            Self::Text(_)
+                | Self::DocumentType(_)
+                | Self::Element(_)
+                | Self::Local(_)
+                | Self::SignalDecaration(_)
+                | Self::Continue(_)
+                | Self::Break(_)
+        )
+    }
 }
 
 impl MatchArmBody for Node {
