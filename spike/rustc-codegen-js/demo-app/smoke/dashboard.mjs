@@ -113,7 +113,10 @@ export async function checkDashboard(check) {
 	// ------------------------------------------------------------ setting up
 
 	check("the island opened exactly one feed", opened.length, 1);
-	check("it is the app's own tick endpoint", opened[0], "/demo/ticks");
+	// The URL is the host's answer, resolved against the host module itself:
+	// that is what carries a deployment's base prefix, and asserting the
+	// resolved form is what proves the island asked rather than spelling a path.
+	check("it is the feed beside the host module", opened[0], new URL("ticks", host).href);
 	check("one listener, for the event the feed names", listeners.length, 1);
 	check("the listener is on `tick`", listeners[0]?.kind, "tick");
 	check("the chart's canvas was found by selector", asked.join(), ".dash-chart");

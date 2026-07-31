@@ -31,7 +31,10 @@
 //! be the thing that parses the tick, which is the no-serializer arrangement the
 //! search island already uses. The host also holds the two handles that outlive
 //! a call, because this crate is `#![no_std]` with no heap and no place to put
-//! one.
+//! one. And the host answers where the feed is: the app may be served under a
+//! base prefix (a static snapshot is), the prefix lives in the URLs the page
+//! and the host carry rather than in compiled code, and the host's own location
+//! is one of those URLs, so the host resolves the feed's path against it.
 //!
 //! # Why setup is safe where it is
 //!
@@ -52,10 +55,6 @@ pub const SYMBOLS: [&str; 5] = ["ACME", "BOLT", "CRUX", "DYAD", "ECHO"];
 
 /// What each symbol costs before the first tick, in cents.
 pub const START_CENTS: [i32; SYMBOLS.len()] = [12_450, 8_075, 23_900, 4_310, 15_620];
-
-/// Where the ticks come from.
-#[cfg(topcoat_client)]
-const FEED: &str = "/demo/ticks";
 
 /// The canvas the chart is drawn on.
 #[cfg(topcoat_client)]
@@ -154,7 +153,7 @@ fn movers(prices: [::view_abi::Sig<f64>; SYMBOLS.len()]) -> Movers {
         let chart = chart_new(query_selector(CANVAS), CONFIG);
         unsafe { dash_hold(chart) };
 
-        let feed = event_source_new(FEED);
+        let feed = event_source_new(unsafe { dash_feed() });
         let sink = unsafe { dash_sink(prices[0], prices[1], prices[2], prices[3], prices[4]) };
         add_listener(feed, TICK, sink);
     }
@@ -250,8 +249,11 @@ struct Series {
 #[::js_extern_macro::js_extern]
 unsafe extern "C" {
     /// `new EventSource(url)`.
+    ///
+    /// The URL is a JavaScript string the host resolved, passed back through
+    /// opaquely rather than respelled as a `&str`.
     #[js(new = "EventSource")]
-    fn event_source_new(url: &str) -> JsValue;
+    fn event_source_new(url: JsValue) -> JsValue;
 
     /// `target.addEventListener(kind, handler)`.
     #[js(method = "addEventListener")]
@@ -294,6 +296,12 @@ unsafe extern "C" {
     /// The list's effect re-runs on every tick and setting up twice would open a
     /// second connection, so the claim is what makes the first run the only one.
     fn dash_claim() -> bool;
+
+    /// Where the ticks come from, resolved by the host against its own URL.
+    ///
+    /// See the module docs: the base prefix a deployment serves the app under
+    /// is nowhere in compiled code, so the host answers this.
+    fn dash_feed() -> JsValue;
 
     /// Keeps the chart, which has to outlive the call that made it.
     fn dash_hold(chart: JsValue);

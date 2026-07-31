@@ -122,6 +122,16 @@ export function dash_claim() {
 	return true;
 }
 
+/// Where the ticks come from.
+///
+/// The feed is served beside this module, so its URL resolves against this
+/// module's own, which is what carries the base prefix a static deployment
+/// serves the app under. The island asks rather than spelling a path itself:
+/// compiled code has no URL of its own to resolve one against.
+export function dash_feed() {
+	return new URL("ticks", import.meta.url).href;
+}
+
 /// Keeps the chart.
 export function dash_hold(handle) {
 	chart = handle;
