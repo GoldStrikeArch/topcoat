@@ -623,11 +623,12 @@ async fn showcase_page() -> Result {
 /// and reads the rows out of `tbody`. Everything the page carries beyond that is
 /// bytes the harness weighs against every other entry.
 ///
-/// The stylesheet link is written out rather than run through [`at`]. Every other
-/// URL on this page moves with the base the snapshot is built for; this one is
-/// the harness's, served from the server root whatever directory the entry is
-/// unpacked into, so it is the one absolute URL here that must not pick up a
-/// prefix.
+/// The stylesheet is the harness's, served from the server root whatever
+/// directory the entry is unpacked into. Every other URL on this page moves
+/// with the base the snapshot is built for; this one must not pick up a
+/// prefix, and `bench-pack.mjs` asserts as much. The one build that prefixes
+/// it is a standalone snapshot, which has no harness to serve it and carries
+/// its own copy (see [`base::BENCH_STANDALONE`]).
 #[page("/bench")]
 async fn bench_page() -> Result {
     view! {
@@ -636,7 +637,7 @@ async fn bench_page() -> Result {
             <head>
                 <meta charset="utf-8">
                 <title>"Topcoat-island-non-keyed"</title>
-                <link href="/css/currentStyle.css" rel="stylesheet">
+                <link href=(bench_style()) rel="stylesheet">
                 // Eager, because an island that waits to be scrolled to is an
                 // island the harness would find unhydrated. The page carries no
                 // `topcoat::runtime::script()`: an island page's markup holds no
@@ -649,6 +650,18 @@ async fn bench_page() -> Result {
                 <div id="main">bench()</div>
             </body>
         </html>
+    }
+}
+
+/// The benchmark page's stylesheet URL.
+///
+/// The harness's own path by default; in a standalone snapshot, the same path
+/// under the base, where `scripts/snapshot.mjs` lays a copy out.
+fn bench_style() -> String {
+    if base::BENCH_STANDALONE {
+        at("/css/currentStyle.css")
+    } else {
+        "/css/currentStyle.css".to_string()
     }
 }
 

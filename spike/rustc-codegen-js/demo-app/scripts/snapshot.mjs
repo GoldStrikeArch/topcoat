@@ -20,7 +20,7 @@
 // the pages it saves actually carry it.
 
 import { spawn } from "node:child_process";
-import { cp, mkdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -123,9 +123,48 @@ async function snapshot() {
 		filter: (from) => !from.endsWith("manifest.toml"),
 	});
 
+	// The benchmark page's stylesheet. A real entry leaves it to the harness;
+	// a standalone snapshot links `<base>/css/currentStyle.css` and carries
+	// the copy itself.
+	if (process.env.TOPCOAT_BENCH_STANDALONE) {
+		const path = join(OUT, "css", "currentStyle.css");
+		await mkdir(dirname(path), { recursive: true });
+		await writeFile(path, await benchStyle());
+	}
+
 	// GitHub Pages runs Jekyll by default, and Jekyll drops underscore
 	// prefixed paths like `/_topcoat/`. This file turns Jekyll off.
 	await writeFile(join(OUT, ".nojekyll"), "");
+}
+
+/// The harness's stylesheet as one file.
+///
+/// `currentStyle.css` is a pair of root-absolute `@import`s, so copied
+/// verbatim under a base both would point outside it; the imported sheets are
+/// concatenated instead. They come from the local krausest clone when
+/// `bench/setup.sh` has made one, and otherwise from the pinned commit on
+/// GitHub (the Pages workflow has no clone).
+async function benchStyle() {
+	const parts = ["css/bootstrap/dist/css/bootstrap.min.css", "css/main.css"];
+	const bench = join(import.meta.dirname, "..", "..", "bench");
+
+	const clone = join(bench, "krausest");
+	if (existsSync(clone)) {
+		const sheets = await Promise.all(parts.map((part) => readFile(join(clone, part), "utf8")));
+		return sheets.join("\n");
+	}
+
+	const pin = (await readFile(join(bench, "KRAUSEST_PIN"), "utf8")).trim();
+	const sheets = [];
+	for (const part of parts) {
+		const url = `https://raw.githubusercontent.com/krausest/js-framework-benchmark/${pin}/${part}`;
+		const reply = await fetch(url);
+		if (!reply.ok) {
+			throw new Error(`${url} answered ${reply.status}`);
+		}
+		sheets.push(await reply.text());
+	}
+	return sheets.join("\n");
 }
 
 await rm(OUT, { recursive: true, force: true });

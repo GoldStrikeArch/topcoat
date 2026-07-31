@@ -109,10 +109,14 @@ jobs:
       - name: build the topcoat CLI
         run: cargo build -p topcoat-cli --bin topcoat
 
+      # `TOPCOAT_BENCH_STANDALONE` marks a snapshot with no benchmark harness
+      # in front of it: the bench page links its own copy of the harness
+      # stylesheet instead of the root URL only the harness serves.
       - name: build the app under the base URL
         working-directory: spike/rustc-codegen-js/demo-app
         env:
           TOPCOAT_BASE_URL: /${{ github.event.repository.name }}
+          TOPCOAT_BENCH_STANDALONE: "1"
         run: |
           set -euo pipefail
           cargo build
@@ -126,6 +130,7 @@ jobs:
         working-directory: spike/rustc-codegen-js/demo-app
         env:
           TOPCOAT_BASE_URL: /${{ github.event.repository.name }}
+          TOPCOAT_BENCH_STANDALONE: "1"
         run: node scripts/snapshot.mjs dist
 
       - uses: actions/upload-pages-artifact@v3

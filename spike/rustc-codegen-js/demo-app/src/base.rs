@@ -16,6 +16,16 @@ pub const BASE_URL: &str = match option_env!("TOPCOAT_BASE_URL") {
     None => "",
 };
 
+/// Whether the benchmark page is deployed with no harness in front of it.
+///
+/// The `/bench` page is a js-framework-benchmark entry, and the harness serves
+/// the entry's stylesheet from the server root, so the page normally writes
+/// that URL out without the prefix. A standalone snapshot (the GitHub Pages
+/// site) has no harness serving it: a build with `TOPCOAT_BENCH_STANDALONE`
+/// set links a copy of the stylesheet under [`BASE_URL`] instead, and
+/// `scripts/snapshot.mjs` lays that copy out.
+pub const BENCH_STANDALONE: bool = option_env!("TOPCOAT_BENCH_STANDALONE").is_some();
+
 /// A path under [`BASE_URL`], for rendering into a page.
 pub fn at(path: &str) -> String {
     let mut url = String::with_capacity(BASE_URL.len() + path.len());
