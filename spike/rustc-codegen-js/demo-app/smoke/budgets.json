@@ -4,7 +4,7 @@
 	"$tolerance": "The band a measured gzip size may exceed its baseline by before the budget fails. The emitter's output moves for reasons that are nobody's regression; what a budget catches is the growth that is.",
 	"$whyTheseMoved": "Re-measured on 2026-07-31 for two reasons. The first is a correction: until jsc-build learned to follow `#[path]` module declarations, an island edit did not rerun the build script, so the chunks the previous baseline was stamped from were older than the island sources; `chunk:shared` in particular was missing `Range::contains` and its `RangeBounds` machinery, which `island/life.rs` and `island/mines.rs` have both reached since they were written. `smoke/compiled.mjs` now reads the newest OUT_DIR rather than the first by name, so a stale one cannot be measured again. The second is real growth with a cause: `island/sand.rs` iterates its pointer-event array BY VALUE again, which pulls `core::array::IntoIter` into `chunk:sand` and costs it about 470 raw bytes.",
 	"tolerance": 0.1,
-	"measured": "2026-07-31",
+	"measured": "2026-08-01",
 	"sizes": {
 		"chunk:counter": {
 			"raw": 2821,
@@ -14,69 +14,53 @@
 			"raw": 3544,
 			"gzip": 1062
 		},
-		"chunk:search": {
-			"raw": 3404,
-			"gzip": 1252
-		},
-		"chunk:dashboard": {
-			"raw": 8152,
-			"gzip": 2137
-		},
 		"chunk:life": {
-			"raw": 25024,
-			"gzip": 5267
+			"raw": 25001,
+			"gzip": 5271
 		},
 		"chunk:sand": {
 			"raw": 25768,
-			"gzip": 5349
+			"gzip": 5346
 		},
 		"chunk:mines": {
-			"raw": 32932,
-			"gzip": 5901
+			"raw": 33057,
+			"gzip": 5943
 		},
 		"chunk:bench": {
 			"raw": 12161,
-			"gzip": 3026
+			"gzip": 3027
 		},
 		"chunk:shared": {
-			"raw": 9452,
-			"gzip": 2230
+			"raw": 9191,
+			"gzip": 2192
 		},
 		"page:counter": {
-			"raw": 12273,
-			"gzip": 2885
+			"raw": 12012,
+			"gzip": 2842
 		},
 		"page:nested": {
-			"raw": 12996,
-			"gzip": 3108
-		},
-		"page:search": {
-			"raw": 12856,
-			"gzip": 3106
-		},
-		"page:dashboard": {
-			"raw": 17604,
-			"gzip": 4008
+			"raw": 12735,
+			"gzip": 3064
 		},
 		"page:life": {
-			"raw": 34476,
-			"gzip": 6927
+			"raw": 34192,
+			"gzip": 6887
 		},
 		"page:sand": {
-			"raw": 35220,
-			"gzip": 6860
+			"raw": 34959,
+			"gzip": 6815
 		},
 		"page:mines": {
-			"raw": 42384,
-			"gzip": 7509
+			"raw": 42248,
+			"gzip": 7475
 		},
 		"page:bench": {
-			"raw": 21613,
-			"gzip": 4855
+			"raw": 21352,
+			"gzip": 4813
 		},
 		"page:showcase": {
-			"raw": 93176,
-			"gzip": 15843
+			"raw": 93017,
+			"gzip": 15801
 		}
 	}
 }

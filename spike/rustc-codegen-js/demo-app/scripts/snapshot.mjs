@@ -8,10 +8,8 @@
 // script bridges the two by fetching the unprefixed route and writing the file
 // where the prefixed URL will look for it.
 //
-// The pages that need a live server (the searching island's POST, the
-// dashboard's event stream) still render; their round trips stay inert in a
-// snapshot, which the showcase page does not mind: its three islands are pure
-// client programs.
+// Every page renders complete; the showcase page's three islands are pure
+// client programs and stay fully interactive in a snapshot.
 //
 //   TOPCOAT_BASE_URL=/topcoat cargo build
 //   TOPCOAT_BASE_URL=/topcoat node scripts/snapshot.mjs dist
@@ -30,15 +28,7 @@ const PORT = process.env.PORT ?? "3111";
 const SERVER = `http://127.0.0.1:${PORT}`;
 
 /// Every page in the app. A new page is a new entry.
-const PAGES = [
-	"/",
-	"/island",
-	"/island/nested",
-	"/island/search",
-	"/island/dashboard",
-	"/island/showcase",
-	"/bench",
-];
+const PAGES = ["/", "/island", "/island/nested", "/island/showcase", "/bench"];
 
 /// The stable-URL artifacts pages load directly. The chunks are not listed:
 /// they come out of the served import map, so an island added to `build.rs`
@@ -50,7 +40,6 @@ const STATIC_FILES = [
 	"/demo/glue.js",
 	"/demo/topcoat-dom.js",
 	"/demo/island-rt.js",
-	"/demo/chart-lib.js",
 	"/demo/island-loader.js",
 	"/demo/chunks.importmap.json",
 ];

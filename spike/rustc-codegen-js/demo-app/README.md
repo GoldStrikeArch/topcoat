@@ -13,7 +13,7 @@ Three panels at `/`:
 - **Panics**, showing a Rust `file:line:column` read from `PanicInfo` inside the
   compiled crate's `#[panic_handler]`.
 
-And five island pages, which are the same idea turned on the DOM: one `view!`
+And three island pages, which are the same idea turned on the DOM: one `view!`
 body is rendered to HTML by the server and compiled to a dom-expressions
 template by the backend, and the browser takes over the markup that is already
 there.
@@ -21,10 +21,6 @@ there.
 - `/island`, a counter (`island/counter.rs`). Hydrated eagerly.
 - `/island/nested`, the same through two component boundaries
   (`island/nested.rs`).
-- `/island/search`, a box that asks the server and renders the reply
-  (`island/search.rs`).
-- `/island/dashboard`, a live market fed by server-sent events, with a chart
-  (`island/dashboard.rs`). See [The dashboard](#the-dashboard).
 - `/island/showcase`, three islands on one page that are *programs* rather than
   bindings. See [The showcase](#the-showcase).
 
@@ -139,115 +135,6 @@ and a `value=(index)` on each cell instead, read back with `e.target_value()`,
 which is the delegated event's original target.
 `examples/dom-tests/23_for_row_handlers.rs` pins both shapes.
 
-## The dashboard
-
-`/island/dashboard` is the one page where the browser talks to JavaScript that
-nobody wrote a binding for by hand. Prices arrive on their own, a list re-ranks
-itself around them, and a chart follows. It is worth reading as three questions:
-what is compiled Rust, what is a declared JavaScript operation, and what is left
-over.
-
-**Compiled Rust is everything with a decision in it.** The five prices are
-signals declared in the `view!` body. The movers list is a `for` loop over all
-five, which is what subscribes it: a tick writes one price, the loop re-runs, and
-the ranking it produces is Rust. The chart's configuration and the series handed
-to it on every update are Rust structs, and they cross the boundary as JavaScript
-objects because that is what the value model spells a `#[repr(C)]` struct as:
-field names in, field names out. No part of the update payload is assembled in
-JavaScript.
-
-**The loop is deliberately not keyed.** A `key (..)` clause makes a row that was
-rendered before contribute the node it contributed before, so reordering moves
-nodes instead of replacing them. The row built on the new pass is discarded, and
-its text with it. That is right for a row whose text does not change, and wrong
-here: keyed, this list re-orders correctly and then shows the numbers from its
-first render for ever. Measured, not assumed, and `smoke/dashboard.mjs` pins the
-behaviour that makes rebuilding the right choice.
-
-**Five operations are declared rather than written**, with `#[js_extern]`:
-
-| declaration | what it emits |
-| --- | --- |
-| `#[js(new = "EventSource")]` | `new EventSource(url)` |
-| `#[js(method = "addEventListener")]` | `target.addEventListener(kind, handler)` |
-| `#[js(call = "document.querySelector")]` | `document.querySelector(selector)` |
-| `#[js(new = "Chart")]`, with a module | `new Chart(target, config)` |
-| `#[js(method = "update")]` | `chart.update(series)` |
-
-The first three name no module, which is what makes them browser globals: they
-are reached at global scope and import nothing. The last two are the chart
-library. A member operation acts on its first argument only when its declaration
-names no module, which is why `chart.update` is declared in a different block
-from the constructor it belongs with.
-
-**What is left over is two things, and both are holes rather than shortcuts.** A
-declared interface cannot express a callback, because handing JavaScript a
-function means handing it a compiled Rust closure. So the function the feed calls
-is made in `src/island-rt.mjs`, and since it is JavaScript already it also parses
-the tick, which saves the island a decoder it has no heap for. The same file
-holds the chart handle and the ranking, because the island's crate is `#![no_std]`
-with no heap and nowhere to keep a value between calls.
-
-### Swapping in a real chart library
-
-The chart here is `contract/fixtures/js-extern/chart-lib.mjs`, a vendored fake:
-it draws nothing and writes down every operation performed on it, which is what
-lets a check assert the series the island sent instead of asking somebody to look
-at a picture. It is served at `/demo/chart-lib.js`.
-
-Which module the declarations reach is decided in one place, the `topcoat-chart`
-entry of the import map that `build.rs` writes. Point that entry at a real chart
-library and the island is unchanged: its declarations already name
-`new Chart(target, config)` and `chart.update(series)`, which is the surface a
-real one has. What would change is the shape of the config and the series, since
-those are Rust structs and a real library wants its own fields.
-
-### The feed
-
-`GET /demo/ticks` is a server-sent event stream, one `tick` event per move:
-
-```
-event: tick
-id: 0
-retry: 900
-data: {"slot":3,"symbol":"DYAD","price":4460,"delta":150}
-```
-
-Three things about it are load bearing.
-
-A tick names a **slot**, not a symbol. The symbols and their opening prices are
-`SYMBOLS` and `START_CENTS` in `island/dashboard.rs`, and the feed reads the
-island's own tables, so there is one symbol table in the program. The browser
-writes `prices[tick.slot]` and holds no copy of it. The `symbol` field is there
-so the stream is legible to a person reading it with `curl`.
-
-Prices are **whole cents** and never a fraction. The island renders a price on
-the server and again in the browser, and those two renders come from two
-different float printers; an integer is what they agree on exactly, and anything
-else is a hydration mismatch waiting for a rounding difference.
-
-The generator is **deterministic when seeded**. It holds no clock, so `?seed=`
-picks a stream: the same seed gives the same symbols, prices and moves in the
-same order every time. `?every=` sets the gap in milliseconds. A client that
-reconnects sends `Last-Event-ID` and the feed winds the generator forward to
-there rather than replaying from the opening prices.
-
-Look at it directly with:
-
-```sh
-curl -N "http://127.0.0.1:3000/demo/ticks?seed=7&every=200"
-```
-
-### Why setup is where it is
-
-Hydration's window is exactly one synchronous call stack, and anything that
-resumes after it finds the window closed and silently rebuilds the DOM instead of
-adopting the server's. Constructing an `EventSource`, registering a listener and
-querying for the canvas are all synchronous calls, so all three happen on the
-first run of the list's effect, inside that window, guarded so they happen once.
-Messages cannot arrive during it: they are delivered in later tasks, by which
-time hydration has returned. No mount hook was needed and none was added.
-
 ## One time setup
 
 The backend and the `core` it compiles against are built once per checkout and
@@ -310,13 +197,6 @@ moves both the rendered count and the bound `disabled` property.
 hydrated at once, that a lazy island's chunk is not fetched until it is seen,
 that each island hydrates against its own key prefix, and that a hydration lost
 to a key the server never wrote is reported in a dev build and nowhere else.
-`smoke/dashboard.mjs` drives the dashboard's whole loop against the real chunk,
-the real host module and the real recording chart library: the chart is built
-with the configuration the island's Rust declares, three ticks pushed through a
-stubbed `EventSource` re-rank the list three times, every row keeps the node it
-was rendered into, and every chart update carries the series the signals hold.
-The two browser globals the island declares are stood up at global scope there,
-which is also what proves that is where the compiled code reached them.
 `smoke/life.mjs`, `smoke/sand.mjs` and `smoke/mines.mjs` do the same for the
 showcase's three, each against the real chunk and the real `src/island-rt.mjs`:
 Life's first render is asserted against the same opening board `island/life.rs`'s
@@ -350,28 +230,19 @@ never exercised. That is the browser checklist:
    than building a new one, and the `<!--$-->`/`<!--/-->` pair stays where the
    server put it. `smoke/check.mjs` pins the claim this rests on. Anything that
    does break here is a regression worth reporting, not the design.
-5. Open `/island/search` with the Network panel open. `search.js` is not fetched
-   until the box is scrolled into view. Type `ru`: one request to `/demo/search`
-   after the typing settles, not one per keystroke, and the reply renders as a
-   list. Type `st` and the list is replaced rather than appended to.
-6. Open `/island/dashboard`. The five rows are in the HTML at their opening
-   prices before any JavaScript runs. Within a few seconds prices start moving
-   and the list re-orders itself, biggest move first, with a rise and a fall
-   coloured differently. The Network panel shows one `ticks` request that stays
-   open and never completes, and the console stays empty.
-7. Open `/island/showcase` with the console and the Network panel open. Nothing
+5. Open `/island/showcase` with the console and the Network panel open. Nothing
    is logged: a hydration that rebuilt the server's markup instead of adopting it
    warns there under `topcoat dev`, and three islands on one page is the first
    time that could happen to more than one at a time. `life.js` is fetched at
    once; `sand.js` and `mines.js` arrive only as their panels are scrolled to.
-8. Life is already running. Click a cell mid-run and it toggles without losing a
+6. Life is already running. Click a cell mid-run and it toggles without losing a
    generation; drag the speed slider and the rate follows; `play / pause`,
    `step`, `reset`, `clear` and `random` each do what they say.
-9. Draw on the sand with the pointer held down. Grains pile and settle rather
+7. Draw on the sand with the pointer held down. Grains pile and settle rather
    than falling for ever, `wall` draws something the sand rests on, and `erase`
    takes it away. Release the pointer outside the canvas, then click a brush: it
    must not stamp a blob where the pointer was.
-10. On the minefield, click anywhere first: it never blows up, and it usually
+8. On the minefield, click anywhere first: it never blows up, and it usually
     opens a region rather than a single cell. Right click flags a cell and no
     context menu appears. Flag every mine, or open every safe cell, and the
     readout says so; click a mine and it does not. `restart` deals a new field
@@ -383,10 +254,10 @@ never exercised. That is the browser checklist:
     `preventDefault`, so the browser's own context menu appears for that one
     click. It is the standard hydration capture script, verbatim, and nothing in
     the island can reach that click before the island exists.
-11. Expand the source viewer. The Rust pane is `island/life.rs` as written and
+9. Expand the source viewer. The Rust pane is `island/life.rs` as written and
     the JavaScript pane is the chunk it compiled to, both readable, neither
     escaped into markup. The page runs no code for either.
-12. Open `/` and check the three panels still work, and that their own runtime is
+10. Open `/` and check the three panels still work, and that their own runtime is
     untouched: view source there still shows `::topcoat::signal(` and
     `data-topcoat-on:click`, neither of which appears inside an island.
 
@@ -398,7 +269,7 @@ and keeps a bare `cargo build --release` in the spike from recursing into this
 build script and its minutes long compile.
 
 **The JavaScript routes bypass `asset!`.** `/demo/app.js`, `/demo/app.js.map`,
-`/demo/shim.js`, `/demo/glue.js`, `/demo/island-rt.js`, `/demo/chart-lib.js` and
+`/demo/shim.js`, `/demo/glue.js`, `/demo/island-rt.js` and
 everything under `/demo/chunks/` are plain routes. The compiled program
 finds its map through a relative `//# sourceMappingURL=app.js.map` comment, and
 a content hashed asset name would break that link. They are served with
@@ -415,9 +286,7 @@ their names appear in `/demo/app.js` exactly as written.
 
 The whole app snapshots into a static site: the islands are compiled at build
 time and every page is server rendered, so a crawl of a locally running server
-is the complete site. The showcase page's islands stay fully interactive; the
-searching island's POST and the dashboard's event stream need a live server
-and stay inert in a snapshot.
+is the complete site. The showcase page's islands stay fully interactive.
 
 A host that serves the site under a subpath (a GitHub Pages project site lives
 at `/<repo>/`) needs every URL prefixed, which happens at the source rather

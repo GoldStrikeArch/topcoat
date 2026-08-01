@@ -77,35 +77,6 @@
       "measured": "2026-07-31",
       "$rebaselined": "was 1289 gzip / 3882 raw, 2026-07-30"
     },
-    "island:search": {
-      "artifacts": [
-        "/demo/chunks/search.js",
-        "/demo/chunks/shared.js"
-      ],
-      "containsIslands": [
-        "search"
-      ],
-      "$note": "The search island's own chunk plus the shared chunk it imports, which is what a browser fetches to run it. Post-chunking this is finally about ONE island: `containsIslands` should read [\"search\"] and a second name appearing in it is a chunking regression, not a size one. This is also the first island carrying a procedure call, so it is the first whose chunk pays for the call path.",
-      "gzip": 3482,
-      "raw": 12856,
-      "measured": "2026-07-31",
-      "$rebaselined": "was 1547 gzip / 3942 raw, 2026-07-30"
-    },
-    "island:dashboard": {
-      "artifacts": [
-        "/demo/chunks/dashboard.js",
-        "/demo/chunks/shared.js"
-      ],
-      "containsIslands": [
-        "dashboard"
-      ],
-      "$note": "The dashboard island's own chunk plus the shared chunk it imports, which is what a browser fetches to run it. `containsIslands` should read [\"dashboard\"] and a second name appearing in it is a chunking regression, not a size one. This is the first island carrying `#[js_extern]` declarations, so it is the first whose chunk pays for a foreign call: the interesting number is how much a declared interface costs over a hand-written one, and there is no prior island to read it off.",
-      "$landed": "First measured 2026-07-30, the run that flipped fixtures/dashboard/ off pending. Bands are the policy's: the greater of 5% of the gzip baseline and 128 bytes.",
-      "gzip": 4365,
-      "raw": 17604,
-      "measured": "2026-07-31",
-      "$rebaselined": "was 2630 gzip / 9385 raw, 2026-07-30"
-    },
     "island:life": {
       "artifacts": [
         "/demo/chunks/life.js",
@@ -148,6 +119,20 @@
       "measured": "2026-07-31",
       "$rebaselined": "first measurement, 2026-07-31"
     },
+    "island:bench": {
+      "artifacts": [
+        "/demo/chunks/bench.js",
+        "/demo/chunks/shared.js"
+      ],
+      "containsIslands": [
+        "bench"
+      ],
+      "$note": "The bench island's own chunk plus the shared chunk it imports; same shape as the other island subjects. The js-framework-benchmark harness weighs its own copy of this delivery separately (bench-pack.mjs); this subject is about what dom.rs serves.",
+      "gzip": 5219,
+      "raw": 21352,
+      "measured": "2026-08-01",
+      "$rebaselined": "was 0 gzip / 0 raw, 2026-07-31"
+    },
     "chunk:shared": {
       "artifacts": [
         "/demo/chunks/shared.js"
@@ -182,11 +167,11 @@
       "artifacts": [
         "/demo/island-rt.js"
       ],
-      "$note": "The host functions the search island borrows from the page: the fetch, the debounce timer and the parsed reply it reads rows out of. Hand-written rather than emitted, like the loader, and budgeted for the same reason -- it ships on the search page and nothing else would notice it growing.",
-      "gzip": 6838,
-      "raw": 17294,
-      "measured": "2026-07-31",
-      "$rebaselined": "was 3570 gzip / 8345 raw, 2026-07-30"
+      "$note": "The host functions the islands borrow from the page: the boards, the clock, the pointer sink and the benchmark's row store. Hand-written rather than emitted, like the loader, and budgeted for the same reason -- it ships on every island page and nothing else would notice it growing.",
+      "gzip": 6129,
+      "raw": 15665,
+      "measured": "2026-08-01",
+      "$rebaselined": "was 6838 gzip / 17294 raw, 2026-07-31"
     },
     "page:island": {
       "artifacts": [
@@ -203,55 +188,17 @@
       "raw": 39673,
       "measured": "2026-07-31",
       "$rebaselined": "was 11661 gzip / 30450 raw, 2026-07-30"
-    },
-    "page:search": {
-      "artifacts": [
-        "/demo/topcoat-dom.js",
-        "/demo/island-loader.js",
-        "/demo/island-rt.js",
-        "/demo/chunks/search.js",
-        "/demo/chunks/shared.js"
-      ],
-      "containsIslands": [
-        "search"
-      ],
-      "$note": "The same for the search page, which is the most expensive page the demo serves: it adds the host module and the procedure call path on top of everything the counter page loads.",
-      "gzip": 20943,
-      "raw": 57550,
-      "measured": "2026-07-31",
-      "$rebaselined": "was 15740 gzip / 39687 raw, 2026-07-30"
-    },
-    "page:dashboard": {
-      "artifacts": [
-        "/demo/topcoat-dom.js",
-        "/demo/island-loader.js",
-        "/demo/island-rt.js",
-        "/demo/chart-lib.js",
-        "/demo/chunks/dashboard.js",
-        "/demo/chunks/shared.js"
-      ],
-      "containsIslands": [
-        "dashboard"
-      ],
-      "$note": "The whole dashboard page. Expected to displace `page:search` as the most expensive page the demo serves: it carries the host module and, unlike search, a foreign chart library the page must also load. Whether the chart module belongs in `artifacts` is decided by how it is delivered -- see fixture.json's `chart.$delivery`. If the page loads it, it is part of what a browser pays for and it belongs here.",
-      "$chartLib": "/demo/chart-lib.js is listed because the PAGE fetches it: the dashboard's chart is a foreign module and a browser pays for it like any other. It is NOT in `island:dashboard`, which is what a browser fetches to run the island's compiled half -- the chart is a peer of the island, not part of it. Today the route serves the contract suite's own recorder (contract/fixtures/js-extern/chart-lib.mjs), so this number will move the day a real library takes its place via the import map's `topcoat-chart` entry, and that move is a fact about the app rather than a regression.",
-      "$landed": "First measured 2026-07-30, the run that flipped fixtures/dashboard/ off pending. Bands are the policy's: the greater of 5% of the gzip baseline and 128 bytes.",
-      "gzip": 26080,
-      "raw": 74426,
-      "measured": "2026-07-31",
-      "$rebaselined": "was 21077 gzip / 57258 raw, 2026-07-30"
     }
   },
   "$notBudgeted": {
     "/demo/chunks/counter.js.map": "A source map. Served, but no browser fetches it unless devtools are open.",
-    "/demo/chunks/dashboard.js.map": "As above. The dashboard's is the largest of the four, which is itself only interesting as a reminder that a source map's size tracks the chunk it describes and no browser pays for it.",
     "/demo/chunks/nested.js.map": "As above.",
-    "/demo/chunks/search.js.map": "As above.",
     "/demo/chunks/shared.js.map": "As above.",
     "/demo/chunks.importmap.json": "The page's import map, served on its own so a harness can resolve a chunk specifier the way the page does. The page itself INLINES the map in a <script type=\"importmap\">, so a browser never fetches this route and it costs a visitor nothing.",
     "/demo/chunks/life.js.map": "As above.",
     "/demo/chunks/sand.js.map": "As above.",
-    "/demo/chunks/mines.js.map": "As above."
+    "/demo/chunks/mines.js.map": "As above.",
+    "/demo/chunks/bench.js.map": "As above."
   },
   "$whyTheseMoved": [
     "2026-07-31: twelve subjects re-baselined at once, and the cause is one event, not twelve.",

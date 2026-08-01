@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 /// The islands the build asks for a chunk of, plus the chunk holding what more
 /// than one of them reaches.
-export const ISLANDS = ["counter", "nested", "search", "dashboard", "life", "sand", "mines", "bench"];
+export const ISLANDS = ["counter", "nested", "life", "sand", "mines", "bench"];
 export const SHARED = "shared";
 
 /// The directory the build published the chunks into.

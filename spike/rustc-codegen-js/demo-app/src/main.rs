@@ -6,17 +6,12 @@
 
 mod base;
 mod dom;
-mod search;
-mod ticks;
 
 #[path = "../island/bench.rs"]
 mod bench_island;
 
 #[path = "../island/counter.rs"]
 mod counter_island;
-
-#[path = "../island/dashboard.rs"]
-mod dashboard_island;
 
 #[path = "../island/life.rs"]
 mod life_island;
@@ -33,19 +28,14 @@ mod panel_component;
 #[path = "../island/sand.rs"]
 mod sand_island;
 
-#[path = "../island/search.rs"]
-mod search_island;
-
 use base::at;
 use bench_island::bench;
 use counter_island::counter;
-use dashboard_island::dashboard;
 use life_island::life;
 use mines_island::mines;
 use nested_island::nested;
 use panel_component::panel;
 use sand_island::sand;
-use search_island::search as search_island_view;
 use topcoat::{
     Result,
     asset::{AssetBundle, AssetConfig, RouterBuilderAssetExt, asset},
@@ -191,9 +181,7 @@ async fn home() -> Result {
                         " is server rendered markup that compiled Rust takes over in the browser, "
                         "and "
                         <a href=(at("/island/nested"))>"the nesting island"</a>
-                        " does it through two component boundaries, and "
-                        <a href=(at("/island/search"))>"the searching island"</a>
-                        " asks the server for its contents."
+                        " does it through two component boundaries."
                     </p>
                     <p>
                         "What that compiler is for is on "
@@ -310,8 +298,6 @@ async fn nested_island_page() -> Result {
                     <p>
                         <a href=(at("/island"))>"the counter island"</a>
                         " | "
-                        <a href=(at("/island/search"))>"the searching island"</a>
-                        " | "
                         <a href=(at("/island/showcase"))>"the showcase"</a>
                         " | "
                         <a href=(at("/"))>"back to the three panels"</a>
@@ -342,132 +328,6 @@ async fn nested_island_page() -> Result {
                         "is why an eager child is numbered before the component it was passed to."
                     </p>
                 )
-            </body>
-        </html>
-    }
-}
-
-/// The search island's page: an island that talks to the server.
-///
-/// The island renders empty, because the server has not been asked anything.
-/// Typing into the box settles into one request, the reply is rendered as a
-/// list, and the next reply replaces it. The island is hydrated lazily, so its
-/// code is not fetched until the box is scrolled into view.
-#[page("/island/search")]
-async fn search_island_page() -> Result {
-    view! {
-        <!DOCTYPE html>
-        <html lang="en">
-            <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1">
-                <title>"A searching island, compiled from Rust"</title>
-                <link rel="stylesheet" href=(asset!("./demo.css"))>
-                topcoat::dev::script()
-                dom::script(events: "input click")
-                topcoat::runtime::script()
-            </head>
-            <body>
-                <header class="intro">
-                    <h1>"A searching island, compiled from Rust"</h1>
-                    <p>
-                        "The box below asks "
-                        <code>"POST /demo/search"</code>
-                        " once the typing settles, and renders the reply. The reply is JSON the "
-                        "browser has already parsed: the island's crate has no heap, so it reads "
-                        "the rows out one at a time instead of decoding them into Rust."
-                    </p>
-                    <p>
-                        <a href=(at("/island"))>"the counter island"</a>
-                        " | "
-                        <a href=(at("/island/nested"))>"the nesting island"</a>
-                        " | "
-                        <a href=(at("/island/showcase"))>"the showcase"</a>
-                        " | "
-                        <a href=(at("/"))>"back to the three panels"</a>
-                    </p>
-                </header>
-
-                <section class="panel">
-                    <h2>"Search"</h2>
-                    search_island_view()
-                    <p class="readout">
-                        "One "
-                        <code>"view!"</code>
-                        " body in "
-                        <code>"demo-app/island/search.rs"</code>
-                        ". The two functions it calls are declared twice, once per target: asking "
-                        "a server for something is the one thing only the browser half can do."
-                    </p>
-                </section>
-            </body>
-        </html>
-    }
-}
-
-/// The dashboard's page: an island fed by the server rather than by the reader.
-///
-/// The server renders the opening prices, which is what the browser adopts. From
-/// then on the page is driven by `GET /demo/ticks`: each tick writes one price
-/// signal, the movers list re-ranks itself around it, and the chart is handed a
-/// fresh series.
-#[page("/island/dashboard")]
-async fn dashboard_island_page() -> Result {
-    view! {
-        <!DOCTYPE html>
-        <html lang="en">
-            <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1">
-                <title>"A streaming island, compiled from Rust"</title>
-                <link rel="stylesheet" href=(asset!("./demo.css"))>
-                topcoat::dev::script()
-                dom::script()
-                topcoat::runtime::script()
-            </head>
-            <body>
-                <header class="intro">
-                    <h1>"A streaming island, compiled from Rust"</h1>
-                    <p>
-                        "Prices arrive on their own over "
-                        <code>"GET /demo/ticks"</code>
-                        ", a server-sent event stream. The browser subscribes with its own "
-                        <code>"EventSource"</code>
-                        ", which the island declares rather than borrows: "
-                        <code>"#[js_extern]"</code>
-                        " names the JavaScript operation and the compiler emits it."
-                    </p>
-                    <p>
-                        <a href=(at("/island"))>"the counter island"</a>
-                        " | "
-                        <a href=(at("/island/nested"))>"the nesting island"</a>
-                        " | "
-                        <a href=(at("/island/search"))>"the searching island"</a>
-                        " | "
-                        <a href=(at("/island/showcase"))>"the showcase"</a>
-                        " | "
-                        <a href=(at("/"))>"back to the three panels"</a>
-                    </p>
-                </header>
-
-                <section class="panel">
-                    <h2>"Movers"</h2>
-                    dashboard()
-                    <p class="readout">
-                        "Five signals, one per symbol. The list reads all five, so a tick that "
-                        "writes one of them re-runs it: that is what re-ranks the rows, and the "
-                        "keys are the symbols, so a row that moves keeps the node it had. The "
-                        "chart is handed a Rust struct, which crosses as a JavaScript object."
-                    </p>
-                    <p class="readout">
-                        "The chart library here is the contract suite's recorder, which draws "
-                        "nothing and writes down what it was asked to do. A real one takes its "
-                        "place by pointing the "
-                        <code>"topcoat-chart"</code>
-                        " entry of the import map at it; the island's declarations already name "
-                        "the surface a real one has."
-                    </p>
-                </section>
             </body>
         </html>
     }
@@ -532,10 +392,6 @@ async fn showcase_page() -> Result {
                         <a href=(at("/island"))>"the counter island"</a>
                         " | "
                         <a href=(at("/island/nested"))>"the nesting island"</a>
-                        " | "
-                        <a href=(at("/island/search"))>"the searching island"</a>
-                        " | "
-                        <a href=(at("/island/dashboard"))>"the streaming island"</a>
                         " | "
                         <a href=(at("/"))>"back to the three panels"</a>
                     </p>

@@ -1,188 +1,16 @@
-// The functions the search island borrows from the page.
+// The functions the islands borrow from the page.
 //
 // A compiled island calls an `extern "C"` function as `__rt.<name>(...)`, and
 // `__rt` is whatever module the island's build was told to import it from. This
-// is that module: the import map resolves `topcoat-island-rt` to it, so the
-// island's own chunk imports these three names and nothing else.
+// is that module: the import map resolves `topcoat-island-rt` to it, so an
+// island's chunk imports the names it uses and nothing else.
 //
-// WHAT LIVES HERE AND WHY
-//
-// The reply is JSON, and the island's crate is `#![no_std]` with no heap: it
-// cannot hold a decoded list of strings. So the decoded reply stays here and the
-// island reads it one row at a time. The debounce is here for the same reason a
-// timer is not a Rust value in that crate, and because a debounce is about when
-// a request is made, which is this side's business either way.
-//
-// HOW AN ANSWER GETS BACK INTO THE VIEW
-//
-// `search_ask` is handed a signal, not a callback. A `Sig<T>` is the runtime's
-// own `[read, write]` pair, so writing to it is `replies[1](value)` and the
-// island's result list re-runs because it read `replies` while it was built.
-// Handing a Rust closure across instead would hand this side an environment
-// object rather than something callable.
-
-/// The pending request's timer, so a new keystroke can cancel it.
-let timer = null;
-
-/// The query the last request was made for.
-///
-/// Reading the answer asks again, because reading is what the result list does
-/// and asking is a side effect of it. This is what makes the second ask a no-op
-/// and keeps the loop from feeding itself.
-let asked = null;
-
-/// The rows of the last answer.
-let rows = [];
-
-/// Bumps the signal the island counts answers with.
-function answered(replies) {
-	replies[1](replies[0]() + 1);
-}
-
-/// Asks for `query`, no sooner than `ms` after it last changed.
-export function search_ask(url, query, ms, replies) {
-	if (query === asked) return;
-	asked = query;
-	clearTimeout(timer);
-
-	// An empty box answers nothing rather than everything, and needs no request
-	// to do it.
-	if (!query) {
-		rows = [];
-		answered(replies);
-		return;
-	}
-
-	timer = setTimeout(async () => {
-		const response = await fetch(url, {
-			method: "POST",
-			headers: { "content-type": "application/topcoat+json" },
-			body: JSON.stringify([query]),
-		});
-		if (!response.ok) {
-			// The body carries which argument the server objected to, which is
-			// the only part of a failure worth reading.
-			console.error(`topcoat: search failed: ${response.status} ${await response.text()}`);
-			return;
-		}
-		rows = await response.json();
-		answered(replies);
-	}, ms);
-}
-
-/// How many rows the last answer carried.
-export function search_len() {
-	return rows.length;
-}
-
-/// One row of it.
-export function search_row(index) {
-	return rows[index];
-}
-
-// ---------------------------------------------------------------- dashboard
-//
-// The dashboard island declares its JavaScript with `#[js_extern]`, so almost
-// nothing it does is here: `new EventSource`, `addEventListener`,
-// `document.querySelector`, `new Chart` and `chart.update` are all compiled from
-// its Rust. What is left is the two things a declared interface has no way to
-// say.
-//
-// THE CALLBACK. Handing JavaScript a function means handing it a compiled Rust
-// closure, and that is a hole in the descriptor set rather than an oversight.
-// So the function the feed calls is made here. Once it is JavaScript, parsing
-// the tick here as well costs nothing and saves the island a decoder it has no
-// heap for, which is the same arrangement the search island uses.
-//
-// THE HANDLES. The chart and the ranking outlive the call that made them, and
-// the island's crate is `#![no_std]` with no heap and no mutable statics, so
-// there is nowhere over there to keep them.
-//
-// A tick names a SLOT, not a symbol. That is deliberate on the server's side:
-// it means this file holds no copy of the symbol table and cannot disagree with
-// the island about what a row is.
-
-/// Whether the island has already set itself up.
-let claimed = false;
-
-/// The chart, once it has been built.
-let chart = null;
-
-/// The slots in rank order, biggest move first. Nothing has moved yet, so the
-/// opening ranking is slot order, which is what the server rendered.
-let ranked = [0, 1, 2, 3, 4];
-
-/// How far each slot last moved, by slot.
-let moved = [0, 0, 0, 0, 0];
-
-/// True the first time, false afterwards.
-export function dash_claim() {
-	if (claimed) return false;
-	claimed = true;
-	return true;
-}
-
-/// Where the ticks come from.
-///
-/// The feed is served beside this module, so its URL resolves against this
-/// module's own, which is what carries the base prefix a static deployment
-/// serves the app under. The island asks rather than spelling a path itself:
-/// compiled code has no URL of its own to resolve one against.
-export function dash_feed() {
-	return new URL("ticks", import.meta.url).href;
-}
-
-/// Keeps the chart.
-export function dash_hold(handle) {
-	chart = handle;
-}
-
-/// The chart that was kept.
-export function dash_chart() {
-	return chart;
-}
-
-/// Which slot sits at `rank`.
-export function dash_slot(rank) {
-	return ranked[rank];
-}
-
-/// How far the symbol in `slot` last moved.
-export function dash_delta(slot) {
-	return moved[slot];
-}
-
-/// The function the feed calls, closing over the five price signals.
-///
-/// A `Sig<T>` is the runtime's own `[read, write]` pair, so writing one is
-/// `sig[1](value)`. Writing is the whole of what an arriving tick does: the
-/// island's list read all five while it was built, so the write is what re-runs
-/// it, and re-running it is what re-ranks the rows and updates the chart.
-export function dash_sink(...prices) {
-	return event => {
-		const tick = JSON.parse(event.data);
-		moved[tick.slot] = tick.delta;
-
-		// Biggest move first, ties broken by slot so a ranking is a function of
-		// the moves alone and two runs of the same feed rank identically.
-		ranked = ranked
-			.slice()
-			.sort((left, right) => Math.abs(moved[right]) - Math.abs(moved[left]) || left - right);
-
-		prices[tick.slot][1](tick.price);
-	};
-}
-
-/// Forgets everything the dashboard is holding.
-///
-/// Only a check calls this: a module is loaded once per page and a page hydrates
-/// its island once, so nothing in a browser ever needs it.
-export function dash_reset() {
-	claimed = false;
-	chart = null;
-	ranked = [0, 1, 2, 3, 4];
-	moved = [0, 0, 0, 0, 0];
-}
+// What lives here is what the islands cannot hold themselves. Their crate is
+// `#![no_std]` with no heap and no mutable statics, so state that outlives a
+// call stays on this side. And a callback is the one thing a declared interface
+// cannot express -- handing JavaScript a function would mean handing it a
+// compiled Rust closure -- so the functions events call are made here, closing
+// over the signals they write.
 
 // ----------------------------------------------------- the showcase islands
 //
@@ -200,10 +28,9 @@ export function dash_reset() {
 // Nothing is copied in either direction, and no island holds any state.
 //
 // WHY THE CLOCK AND THE POINTER ARE HERE. Both are callbacks, and a callback is
-// the one thing `#[js_extern]` cannot declare, for the reason the dashboard's
-// note gives: handing JavaScript a function means handing it a compiled Rust
-// closure. So the function is made here and given the signals to write, which is
-// `dash_sink`'s arrangement with a timer and a pointer in place of a feed.
+// the one thing `#[js_extern]` cannot declare, for the reason the header gives:
+// handing JavaScript a function means handing it a compiled Rust closure. So
+// the function is made here and given the signals to write.
 //
 // WHAT IS NOT HERE, deliberately: any rule of any game. Every export below is
 // game agnostic -- a numbered array, an exchange, a counter that goes up. The
@@ -222,10 +49,10 @@ const clocks = [];
 
 /// True the first time `id` asks and false afterwards.
 ///
-/// The same guard `dash_claim` is: an island's setup runs inside an effect, the
-/// effect re-runs whenever the island's state moves, and setting up twice would
-/// stamp the board twice and start a second clock. A number rather than a flag
-/// because three islands share this file.
+/// An island's setup runs inside an effect, the effect re-runs whenever the
+/// island's state moves, and setting up twice would stamp the board twice and
+/// start a second clock, so the claim is what makes the first run the only one.
+/// A number rather than a flag because three islands share this file.
 export function claim(id) {
 	if (claims.has(id)) return false;
 	claims.add(id);
@@ -308,9 +135,10 @@ export function pointer_sink(x, y, down) {
 
 /// Forgets every board, claim and clock.
 ///
-/// Only a check calls this, for `dash_reset`'s reason and one more: an open
-/// interval keeps node alive, so without this `smoke/check.mjs` runs its checks
-/// and then never exits.
+/// Only a check calls this: a module is loaded once per page and a page
+/// hydrates its islands once, so nothing in a browser ever needs it. And an
+/// open interval keeps node alive, so without this `smoke/check.mjs` runs its
+/// checks and then never exits.
 export function rt_reset() {
 	boards.clear();
 	claims.clear();
@@ -326,7 +154,7 @@ export function rt_reset() {
 // WHY THE ROWS ARE HERE. The island crate is `#![no_std]` with no heap and no
 // mutable statics, so a list that survives from one click to the next is not a
 // thing it can declare. An array of `{ id, label }` objects made here is one it
-// can read a field at a time, which is the search island's arrangement.
+// can read a field at a time.
 //
 // WHY THE LABELS ARE BUILT HERE. A label is three words joined by spaces, and
 // joining strings needs a heap. So the island picks the three words -- which is
@@ -336,8 +164,7 @@ export function rt_reset() {
 //
 // WHY THE ID COUNTER IS HERE. The benchmark requires ids to start at 1 and never
 // restart, not even after clearing the table, so the counter outlives every row
-// it numbered. That is the same "nowhere over there to keep it" the chart handle
-// has.
+// it numbered, and there is nowhere over there to keep it.
 //
 // WHY SELECTION IS ONE ID. There is one selected row, so there is one id, and a
 // row's class is derived from it when the row is read. A per-row flag would be
@@ -416,7 +243,7 @@ export function bench_clear() {
 ///
 /// Only a check calls this: a page loads this module once and a table is never
 /// asked to start its ids again, so nothing in a browser needs it. It is
-/// `dash_reset`'s and `rt_reset`'s counterpart for this island.
+/// `rt_reset`'s counterpart for this island.
 export function bench_reset() {
 	benchRows = [];
 	benchNextId = 1;
@@ -429,7 +256,7 @@ export function bench_reset() {
 // spelling, and `__rt` is whatever module the build named. The islands are built
 // with NO SHIM, because a shim is a global-scope script and these are modules,
 // so this file is `__rt` and every helper the program reaches for has to be
-// here. The dashboard is the first island to need any of them.
+// here.
 //
 // To find out which: read the emitted chunks.
 //

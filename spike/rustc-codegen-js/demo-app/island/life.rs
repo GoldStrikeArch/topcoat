@@ -206,7 +206,7 @@ fn alive_class(alive: bool) -> &'static str {
 /// The browser's compiler hands a handler a borrowed event and the server's hands
 /// it an owned one, so the type is declared once per target and the handler names
 /// only this. Naming the type in the parameter instead would name one target's
-/// type in both. The search island's arrangement, and for its reasons.
+/// type in both.
 #[cfg(topcoat_client)]
 type Ev<'a> = &'a ::view_abi::Event;
 
@@ -247,8 +247,7 @@ fn cells(_generation: f64, _edits: f64, tick: ::view_abi::Sig<f64>) -> Cells {
 
 /// The cells of the current board, one at a time.
 ///
-/// An iterator rather than a collection, for the reason the search island's is:
-/// there is no heap here to collect into.
+/// An iterator rather than a collection: there is no heap here to collect into.
 #[cfg(topcoat_client)]
 struct Cells {
     at: i32,
@@ -504,7 +503,7 @@ fn stride(speed: f64) -> i32 {
 /// page's `claim` so that only the first call does anything. An island's setup
 /// must be synchronous -- hydration's window is exactly one synchronous call
 /// stack -- and every call here is, so the first run of a hole is the right place
-/// for it. That is the dashboard island's arrangement.
+/// for it.
 #[cfg(topcoat_client)]
 fn open(tick: ::view_abi::Sig<f64>) {
     if !unsafe { claim(CLAIM) } {

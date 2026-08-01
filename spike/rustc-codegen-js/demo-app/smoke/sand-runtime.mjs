@@ -1,8 +1,8 @@
 // The runtime names the compiled sand island calls, and the canvas it draws on.
 //
-// Its own stub rather than `dashboard-runtime.mjs`'s, for two reasons. The node
-// graph is a different shape -- the island's two holes are spans the compiled
-// code reaches by walking `firstChild` and `nextSibling` past two text nodes --
+// Its own stub rather than a shared one, for two reasons. The node graph is a
+// shape of its own -- the island's two holes are spans the compiled code
+// reaches by walking `firstChild` and `nextSibling` past two text nodes --
 // and, more to the point, this island DRAWS. A canvas cannot be pretended at:
 // the whole claim being made is that the picture is decided by compiled Rust, so
 // the surface has to be a RECORDER. It draws nothing and writes down every
@@ -10,9 +10,8 @@
 // value a check can assert instead of a picture somebody has to look at. That is
 // `contract/fixtures/js-extern/chart-lib.mjs`'s arrangement, for a canvas.
 //
-// `template(html)` PARSES the html it is given rather than pretending, which is
-// `dashboard-runtime.mjs`'s reason and lifted from it: it is the emitter's own
-// declaration, so the graph the compiled code walks is the graph the emitter
+// `template(html)` PARSES the html it is given rather than pretending: it is
+// the emitter's own declaration, so the graph the compiled code walks is the graph the emitter
 // said it would walk, and a stub cannot quietly agree with a shape the compiler
 // does not actually emit.
 //
@@ -65,10 +64,9 @@ function node(kind, extra = {}) {
 /// Links `children` into `parent` as a sibling chain, the way a parsed document
 /// has them.
 ///
-/// Every link is cleared before any is made, for `dashboard-runtime.mjs`'s
-/// reason: relinking a node that is already in the chain without clearing first
-/// leaves a stale `nextSibling` pointing at a node now earlier in the list,
-/// which is a cycle.
+/// Every link is cleared before any is made: relinking a node that is already
+/// in the chain without clearing first leaves a stale `nextSibling` pointing at
+/// a node now earlier in the list, which is a cycle.
 function adopt(parent, children) {
 	parent.firstChild = null;
 	for (const child of children) child.nextSibling = null;

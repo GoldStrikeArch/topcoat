@@ -4,8 +4,7 @@ name: Deploy Demos
 # backend compiles the islands to JavaScript at build time and the server
 # renders every page, so a crawl of a locally running server is a complete
 # site: the showcase page's three islands are pure client programs and stay
-# fully interactive. The pages that need a live server (the searching island's
-# POST, the dashboard's event stream) render but their round trips stay inert.
+# fully interactive.
 #
 # A project site is served under `/<repo>/`, so the app is built with
 # `TOPCOAT_BASE_URL=/<repo>`: every URL the pages carry picks the prefix up at

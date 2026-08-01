@@ -19,8 +19,7 @@
 // So the gates are a property of the two-pass arrangement, which is jsc-build's
 // and not this crate's, and jsc-build injects them into the expand step. See
 // `jsc-build/src/toolchain.rs`, `EXPANSION_GATES`, which also says which
-// lowering wants which gate. The dashboard rediscovered all three one
-// `error[E0658]` at a time; the next island will not have to.
+// lowering wants which gate.
 #![no_std]
 #![no_main]
 
@@ -34,9 +33,6 @@ mod bench;
 
 #[path = "../island/counter.rs"]
 mod counter;
-
-#[path = "../island/dashboard.rs"]
-mod dashboard;
 
 #[path = "../island/life.rs"]
 mod life;
@@ -52,6 +48,3 @@ mod panel;
 
 #[path = "../island/sand.rs"]
 mod sand;
-
-#[path = "../island/search.rs"]
-mod search;

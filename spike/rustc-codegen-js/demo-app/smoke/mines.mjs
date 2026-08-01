@@ -45,9 +45,9 @@ const OPENING = 40;
 
 /// The island's own tables, read out of its source.
 ///
-/// Read rather than repeated, for `dashboard.mjs`'s reason: the two halves of the
-/// island already share one set of tables, and a check carrying a third copy is a
-/// check that can agree with neither. A shape this cannot read is an error.
+/// Read rather than repeated: the two halves of the island already share one
+/// set of tables, and a check carrying a third copy is a check that can agree
+/// with neither. A shape this cannot read is an error.
 function tables() {
 	const source = readFileSync(join(import.meta.dirname, "..", "island", "mines.rs"), "utf8");
 

@@ -1,10 +1,9 @@
 // The runtime names the compiled life island calls, over a node graph PARSED out
 // of the template the chunk declares.
 //
-// Its own stub rather than `search-runtime.mjs`'s, and not for the reason that
-// one is its own: the difference here is not the shape of an insert but the shape
-// of the WALK. The counter's and the search island's markup are two nodes deep
-// and their stubs write the graph out by hand; this island's is a readout of four
+// Its own stub rather than `stub.mjs`: the difference here is not the shape of
+// an insert but the shape of the WALK. The counter's markup is two nodes deep
+// and its stub writes the graph out by hand; this island's is a readout of four
 // nodes, a grid, five buttons and a labelled slider, and the emitter reaches each
 // of them by a chain of `firstChild` and `nextSibling` that counts the text
 // between them. A graph written out by hand would be a second copy of the markup

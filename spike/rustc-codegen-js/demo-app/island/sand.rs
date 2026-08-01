@@ -27,8 +27,7 @@
 //!
 //! # What the host module lends it
 //!
-//! Two things a declared interface cannot say, which is the same list the
-//! dashboard has.
+//! Two things a declared interface cannot say.
 //!
 //! A PLACE TO KEEP A BOARD. This crate is `#![no_std]` with no heap and no
 //! mutable statics, so a `[u8; 2400]` that survives from one frame to the next
@@ -39,9 +38,8 @@
 //!
 //! TWO CALLBACKS. A clock and a pointer both call a function, and handing
 //! JavaScript a function means handing it a compiled Rust closure. So both are
-//! made in [`island-rt`](../src/island-rt.mjs) and handed the signals to write,
-//! which is `dash_sink`'s arrangement with a timer and a pointer in place of a
-//! feed. Neither knows anything about sand.
+//! made in [`island-rt`](../src/island-rt.mjs) and handed the signals to write.
+//! Neither knows anything about sand.
 //!
 //! # Two holes, and why they do not overlap
 //!
@@ -55,7 +53,6 @@
 //! as a `for` over an iterator of one value, because a `$( .. )` is compiled by
 //! the server's expression language as well as by the client's and that language
 //! has no free function calls; a loop's iterable is plain Rust on both halves.
-//! `island/search.rs` gives the same reason at length.
 //!
 //! # Why setup is safe where it is
 //!
@@ -162,8 +159,7 @@ const NEXT: f64 = 4.0;
 /// The number of grains a frame ends with, as an iterator of one.
 ///
 /// An iterator because the view reaches this through a `for`, which is where a
-/// hole may call a function. `island/search.rs`'s `Hits` is the same shape for
-/// the same reason, over a list rather than over one number.
+/// hole may call a function.
 ///
 /// A flag rather than an `Option` the iterator takes from, and that is measured:
 /// `Option::take` lowers to `__rt.overwrite`, which `src/island-rt.mjs` does not
@@ -498,9 +494,8 @@ unsafe extern "C" {
     ///
     /// Called once per frame and once per stamp rather than held. Caching the
     /// canvas would need somewhere to put it, and the only somewhere is a host
-    /// slot like the dashboard's `dash_hold`; the shared `__rt` surface offers
-    /// none on purpose, and two property lookups a frame is not what a frame
-    /// costs.
+    /// slot; the shared `__rt` surface offers none on purpose, and two property
+    /// lookups a frame is not what a frame costs.
     #[js(call = "document.querySelector")]
     fn query_selector(selector: &str) -> JsValue;
 

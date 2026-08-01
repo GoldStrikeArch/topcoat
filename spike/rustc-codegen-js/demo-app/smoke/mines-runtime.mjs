@@ -1,8 +1,8 @@
 // The runtime names the compiled Minesweeper island calls, over a node graph
 // built from the chunk's own templates.
 //
-// Its own stub rather than `search-runtime.mjs`'s, for the reason that one is not
-// `stub.mjs`: this island's rows have children of their own -- a note is a span
+// Its own stub rather than `stub.mjs`: this island's rows have children of
+// their own -- a note is a span
 // with two spans in it, and the emitted code walks `firstChild`/`nextSibling`
 // through them -- so a cloner that makes a bare element is not enough.
 //

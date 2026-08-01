@@ -275,7 +275,7 @@ async fn runtime_js() -> Result<Module> {
     )))
 }
 
-/// The functions the search island borrows from the page.
+/// The functions the islands borrow from the page.
 ///
 /// A compiled island calls an `extern "C"` function as `__rt.<name>(...)`, and
 /// the import map resolves `topcoat-island-rt` to this, so an island's chunk
@@ -283,24 +283,6 @@ async fn runtime_js() -> Result<Module> {
 #[route(GET "/demo/island-rt.js")]
 async fn island_rt_js() -> Result<Module> {
     Ok(Module::script(include_str!("island-rt.mjs")))
-}
-
-/// The chart library the dashboard island declares with `#[js_extern]`.
-///
-/// This is the contract suite's fake: a recorder shaped like a chart library,
-/// vendored rather than fetched, which draws nothing and writes down every
-/// operation performed on it. That is what makes a check able to assert the
-/// series the island sent rather than that a picture appeared.
-///
-/// A real chart library takes its place by pointing the `topcoat-chart` entry of
-/// the import map at one. The island's declarations do not change: they already
-/// name `new Chart(target, config)` and `chart.update(series)`, which is the
-/// surface a real one has.
-#[route(GET "/demo/chart-lib.js")]
-async fn chart_lib_js() -> Result<Module> {
-    Ok(Module::script(include_str!(
-        "../../contract/fixtures/js-extern/chart-lib.mjs"
-    )))
 }
 
 /// The import map the page embeds, served on its own as well.
@@ -336,11 +318,6 @@ async fn chunk_js(cx: &Cx) -> Result<Module> {
             Module::script(include_str!(concat!(env!("OUT_DIR"), "/chunks/counter.js")))
         }
         "nested.js" => Module::script(include_str!(concat!(env!("OUT_DIR"), "/chunks/nested.js"))),
-        "search.js" => Module::script(include_str!(concat!(env!("OUT_DIR"), "/chunks/search.js"))),
-        "dashboard.js" => Module::script(include_str!(concat!(
-            env!("OUT_DIR"),
-            "/chunks/dashboard.js"
-        ))),
         "life.js" => Module::script(include_str!(concat!(env!("OUT_DIR"), "/chunks/life.js"))),
         "sand.js" => Module::script(include_str!(concat!(env!("OUT_DIR"), "/chunks/sand.js"))),
         "mines.js" => Module::script(include_str!(concat!(env!("OUT_DIR"), "/chunks/mines.js"))),
@@ -353,14 +330,6 @@ async fn chunk_js(cx: &Cx) -> Result<Module> {
         "nested.js.map" => Module::source_map(include_str!(concat!(
             env!("OUT_DIR"),
             "/chunks/nested.js.map"
-        ))),
-        "search.js.map" => Module::source_map(include_str!(concat!(
-            env!("OUT_DIR"),
-            "/chunks/search.js.map"
-        ))),
-        "dashboard.js.map" => Module::source_map(include_str!(concat!(
-            env!("OUT_DIR"),
-            "/chunks/dashboard.js.map"
         ))),
         "life.js.map" => Module::source_map(include_str!(concat!(
             env!("OUT_DIR"),
@@ -422,16 +391,7 @@ mod tests {
         // holds in a `TOPCOAT_BASE_URL` build.
         let base = crate::base::BASE_URL;
         assert!(IMPORT_MAP.contains(&format!(r#""topcoat-dom":"{base}/demo/topcoat-dom.js""#)));
-        for island in [
-            "counter",
-            "nested",
-            "search",
-            "dashboard",
-            "life",
-            "sand",
-            "mines",
-            "bench",
-        ] {
+        for island in ["counter", "nested", "life", "sand", "mines", "bench"] {
             assert!(
                 IMPORT_MAP.contains(&format!(
                     r#""topcoat-island/{island}":"{base}/demo/chunks/{island}.js""#

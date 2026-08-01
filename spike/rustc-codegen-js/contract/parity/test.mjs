@@ -613,16 +613,16 @@ checks.ok(
 // `1` here and observed `[1]` by the server. So every field it compares is
 // perturbed and asserted to be caught by name.
 
-const searchWire = JSON.parse(readFileSync(join(import.meta.dirname, "fixtures", "search", "fixture.json"), "utf8")).wire;
+const sampleWire = JSON.parse(readFileSync(join(import.meta.dirname, "lib", "wire-sample.json"), "utf8")).wire;
 
-checks.is("the search fixture's wire block agrees with procedure-wire.json", wireParity(searchWire).differences, []);
+checks.is("the sample wire block agrees with procedure-wire.json", wireParity(sampleWire).differences, []);
 checks.ok(
 	"and the run is told the error vector was corrected, so nobody re-derives the old spelling",
-	wireParity(searchWire).notes.some(note => note.includes("$corrected")),
+	wireParity(sampleWire).notes.some(note => note.includes("$corrected")),
 );
 
 const caught = field => {
-	const perturbedWire = structuredClone(searchWire);
+	const perturbedWire = structuredClone(sampleWire);
 	if (field === "vectors.error") perturbedWire.vectors.error = "no-such-vector";
 	else perturbedWire[field] = typeof perturbedWire[field] === "number" ? perturbedWire[field] + 1 : `${perturbedWire[field]}-wrong`;
 	return wireParity(perturbedWire).differences;
@@ -640,13 +640,13 @@ checks.ok("a vector id that does not exist is caught", caught("vectors.error").s
 // against POST /demo/search confirmed answers `[0]`. So the rule is first checked
 // against the vector's own recorded suffix, which is a closed loop, and only then
 // applied at the fixture's own index.
-checks.is("the fixture's error suffix is the rule at ITS argument index, not the vector's literal", searchWire.errorBodyEndsWith, "(at `[0]`)");
-checks.is("and the vector it validates the rule against records a different index", wireSpec().vectors.find(vector => vector.id === searchWire.vectors.error).expect.bodyEndsWith, "(at `[1]`)");
+checks.is("the fixture's error suffix is the rule at ITS argument index, not the vector's literal", sampleWire.errorBodyEndsWith, "(at `[0]`)");
+checks.is("and the vector it validates the rule against records a different index", wireSpec().vectors.find(vector => vector.id === sampleWire.vectors.error).expect.bodyEndsWith, "(at `[1]`)");
 checks.ok(
 	"a fixture whose suffix does not match the rule at its own index is caught",
 	caught("errorBodyEndsWith")[0].includes("the path rule at argument index 0"),
 );
-const ruleBroken = structuredClone(searchWire);
+const ruleBroken = structuredClone(sampleWire);
 ruleBroken.errorVectorArgumentIndex = 5;
 checks.ok(
 	"and a rule that stops reproducing the VECTOR's suffix is caught separately, naming the vector",
@@ -659,8 +659,8 @@ checks.ok(
 
 // The call target. Two shapes, because a compiled island cannot use the procedure
 // route: the id is minted per expansion and an island's file is expanded twice.
-checks.is("the search fixture targets a written-down path, not the procedure route", searchWire.callTarget.kind, "exactPath");
-const badTarget = structuredClone(searchWire);
+checks.is("the sample wire targets a written-down path, not the procedure route", sampleWire.callTarget.kind, "exactPath");
+const badTarget = structuredClone(sampleWire);
 badTarget.callTarget = { kind: "exactPath" };
 checks.ok("an exactPath target with no path is caught", wireParity(badTarget).differences.some(difference => difference.includes("no `path` is declared")));
 badTarget.callTarget = { kind: "somethingElse", path: "/x" };
@@ -669,14 +669,14 @@ checks.ok("and an unknown target kind is caught", wireParity(badTarget).differen
 // The stub. Its job is to record what was sent before answering, and to refuse to
 // invent a reply -- an island that made one more call than the fixture planned has
 // learned something and must not be told it passed.
-const stub = fetchStub(searchWire, [{ status: 200, contentType: "application/json", body: '["rust"]' }]);
-const answered = await stub.fetch(searchWire.callTarget.path, {
+const stub = fetchStub(sampleWire, [{ status: 200, contentType: "application/json", body: '["rust"]' }]);
+const answered = await stub.fetch(sampleWire.callTarget.path, {
 	method: "POST",
-	headers: { "Content-Type": searchWire.requestContentType },
+	headers: { "Content-Type": sampleWire.requestContentType },
 	body: '["ru"]',
 });
 checks.is("the stub records the decoded arguments, not the byte string", stub.calls[0].args, ["ru"]);
-checks.is("and the content type it was sent", stub.calls[0].contentType, searchWire.requestContentType);
+checks.is("and the content type it was sent", stub.calls[0].contentType, sampleWire.requestContentType);
 checks.ok("a call to the fixture's declared path is on target", stub.calls[0].onTarget);
 checks.ok("and that path is NOT the procedure route, so the two are told apart", !stub.calls[0].isProcedureRoute);
 checks.is("the reply's body is readable as text", await answered.text(), '["rust"]');
@@ -685,7 +685,7 @@ checks.is("the queue is now empty", stub.pending, 0);
 
 let overflowed = null;
 try {
-	await stub.fetch(searchWire.callTarget.path, { method: "POST", body: "[]" });
+	await stub.fetch(sampleWire.callTarget.path, { method: "POST", body: "[]" });
 } catch (error) {
 	overflowed = error.message;
 }
@@ -693,11 +693,11 @@ checks.ok("a call past the end of the queue throws rather than inventing a reply
 
 // The route-shape test, which is the whole reason the fixture does not assert a
 // literal id: two segments is not a procedure route, and neither is a bare prefix.
-const shapes = fetchStub(searchWire, [{ status: 200, contentType: "application/json", body: "null" }, { status: 200, contentType: "application/json", body: "null" }]);
-await shapes.fetch(`${searchWire.routePrefix}/a/b`, { method: "POST", body: "[]" });
-await shapes.fetch(`${searchWire.routePrefix}/`, { method: "POST", body: "[]" });
+const shapes = fetchStub(sampleWire, [{ status: 200, contentType: "application/json", body: "null" }, { status: 200, contentType: "application/json", body: "null" }]);
+await shapes.fetch(`${sampleWire.routePrefix}/a/b`, { method: "POST", body: "[]" });
+await shapes.fetch(`${sampleWire.routePrefix}/`, { method: "POST", body: "[]" });
 checks.ok("two path segments is not a procedure route", !shapes.calls[0].isProcedureRoute);
-checks.ok("the prefix plus exactly one segment IS one, which is all that is knowable about a uuid id", (await (async () => { const one = fetchStub(searchWire, [{ status: 200, contentType: "application/json", body: "null" }]); await one.fetch(`${searchWire.routePrefix}/018f-abc`, { method: "POST", body: "[]" }); return one.calls[0].isProcedureRoute; })()));
+checks.ok("the prefix plus exactly one segment IS one, which is all that is knowable about a uuid id", (await (async () => { const one = fetchStub(sampleWire, [{ status: 200, contentType: "application/json", body: "null" }]); await one.fetch(`${sampleWire.routePrefix}/018f-abc`, { method: "POST", body: "[]" }); return one.calls[0].isProcedureRoute; })()));
 checks.ok("and neither is the prefix with an empty id", !shapes.calls[1].isProcedureRoute);
 
 // ---------- the .d.ts goldens harness ----------

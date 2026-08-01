@@ -19,12 +19,10 @@ import { pathToFileURL } from "node:url";
 import { checkBench } from "./bench.mjs";
 import { checkBudgets } from "./budgets.mjs";
 import { compiled } from "./compiled.mjs";
-import { checkDashboard } from "./dashboard.mjs";
 import { checkLife } from "./life.mjs";
 import { checkLoader } from "./loader.mjs";
 import { checkMines } from "./mines.mjs";
 import { checkSand } from "./sand.mjs";
-import { checkSearch } from "./search.mjs";
 import { stage } from "./stage.mjs";
 import { calls, decrement, display, increment } from "./stub.mjs";
 
@@ -112,16 +110,6 @@ check("the bound property tracked the signal back up", decrement.disabled, false
 // the first insert build a fresh text node and delete the server's, which is a
 // visible mutation on a hydrate that should have none.
 check("the insert claims the server's text node and nothing else", (call("getNextMarker").claimed ?? []).join(" "), '"5"');
-
-// The search island's whole loop, against the real compiled chunk and the real
-// host module: typing, the debounce, the request, and the reply. See search.mjs.
-console.log("");
-await checkSearch(check);
-
-// The dashboard's whole loop, against the real compiled chunk, the real host
-// module and the real recording chart library. See dashboard.mjs.
-console.log("");
-await checkDashboard(check);
 
 // The showcase's three, each in a module of its own so that three islands can be
 // written at once without three authors editing this file. All three drive the

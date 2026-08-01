@@ -30,9 +30,9 @@
 //! read an event and write a signal, and that is the whole of what these three do.
 //!
 //! Everything else -- placing the mines, flooding a region, counting what is
-//! left -- runs in the plain Rust a `for` loop's iterable is on both halves, which
-//! is where the search island already makes its host calls from. [`cells`] and
-//! [`notes`] are those iterables, and both begin by calling [`apply`].
+//! left -- runs in the plain Rust a `for` loop's iterable is on both halves.
+//! [`cells`] and [`notes`] are those iterables, and both begin by calling
+//! [`apply`].
 //!
 //! # Why applying is guarded by a token
 //!
@@ -376,8 +376,8 @@ fn status_of(cells: &[u8]) -> Note {
 
 /// The cells of the field, one at a time.
 ///
-/// An iterator rather than a collection, for the reason the search island's is:
-/// the field is the host's and this crate has nowhere to copy it to.
+/// An iterator rather than a collection: the field is the host's and this crate
+/// has nowhere to copy it to.
 struct Cells {
     at: i32,
     cells: &'static [u8],

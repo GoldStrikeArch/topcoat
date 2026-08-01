@@ -50,9 +50,9 @@ import { stage } from "./stage.mjs";
 
 /// The island's own numbers, read out of its source.
 ///
-/// Read rather than repeated, for `dashboard.mjs`'s reason: a check carrying its
-/// own copy of the grid size is a check that can disagree with the island about
-/// what a cell is. A shape this cannot read is an error, not a default.
+/// Read rather than repeated: a check carrying its own copy of the grid size is
+/// a check that can disagree with the island about what a cell is. A shape this
+/// cannot read is an error, not a default.
 function tables() {
 	const source = readFileSync(join(import.meta.dirname, "..", "island", "sand.rs"), "utf8");
 

@@ -38,10 +38,9 @@
 //!
 //! # Why the rows are read one at a time
 //!
-//! [`Rows`] is an iterator over the store rather than a collection, for the reason
-//! the search island's is: the rows are the host's and there is nowhere in this
-//! crate to copy them to. It hands the loop a [`RowView`] per row, which is four
-//! borrowed values and no allocation.
+//! [`Rows`] is an iterator over the store rather than a collection: the rows are
+//! the host's and there is nowhere in this crate to copy them to. It hands the
+//! loop a [`RowView`] per row, which is four borrowed values and no allocation.
 //!
 //! # Why the handlers are per row
 //!
@@ -182,8 +181,8 @@ fn rows(_version: f64) -> Rows {
 
 /// The rows of the store, one at a time.
 ///
-/// An iterator rather than a collection, for the reason the search island's is:
-/// the rows are the host's and this crate has no heap to copy them into.
+/// An iterator rather than a collection: the rows are the host's and this crate
+/// has no heap to copy them into.
 #[cfg(topcoat_client)]
 struct Rows {
     at: f64,

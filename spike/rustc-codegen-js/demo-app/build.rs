@@ -31,26 +31,19 @@ fn main() {
         // Every `__rt.<name>` the emitted chunks reach for is checked against
         // this module's exports before the build succeeds. Without it a helper
         // the module does not supply is a `TypeError` the first time that line
-        // runs in a browser, which is how the dashboard found `f2i` and
-        // `str_bytes` in wave 5.
+        // runs in a browser.
         .shim_module_source("src/island-rt.mjs")
         .chunks(
             jsc_build::Chunking::new()
                 .island("counter")
                 .island("nested")
-                .island("search")
-                .island("dashboard")
                 .island("life")
                 .island("sand")
                 .island("mines")
                 .island("bench")
                 .url_base(format!("{base}/demo/chunks/"))
                 .import("topcoat-dom", format!("{base}/demo/topcoat-dom.js"))
-                .import("topcoat-island-rt", format!("{base}/demo/island-rt.js"))
-                // Which module the dashboard's `#[js_extern]` chart declarations
-                // reach is decided here and nowhere else. A real chart library
-                // swaps in by pointing this entry somewhere else.
-                .import("topcoat-chart", format!("{base}/demo/chart-lib.js")),
+                .import("topcoat-island-rt", format!("{base}/demo/island-rt.js")),
         )
         .render()
         .unwrap();
